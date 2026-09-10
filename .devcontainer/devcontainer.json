@@ -1,0 +1,28 @@
+{
+  "name": "SMRT",
+
+  // Compose rather than direct mounts, because devcontainer.json variable
+  // substitution has no default syntax and an unset path breaks container
+  // creation. See docker-compose.yml.
+  "dockerComposeFile": "docker-compose.yml",
+  "service": "smrt",
+  "workspaceFolder": "/subject",
+
+  "remoteUser": "smrt",
+
+  // Runs on the HOST before the container is created. Creates the default
+  // vault and state directories so the binds always have something to attach
+  // to, and writes .env with your real UID/GID.
+  "initializeCommand": "bash .devcontainer/initialize.sh",
+
+  "postCreateCommand": "bash /subject/.devcontainer/post-create.sh",
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "yzhang.markdown-all-in-one",
+        "bierner.markdown-mermaid"
+      ]
+    }
+  }
+}

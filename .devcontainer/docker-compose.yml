@@ -1,0 +1,37 @@
+# Compose, not raw devcontainer mounts, for one reason: devcontainer.json's
+# ${localEnv:X} has NO default syntax, so an unset VAULT_PATH becomes an empty
+# bind source and Docker fails at create time. Compose supports ${VAR:-default}.
+#
+# initialize.sh runs on the host before this and guarantees both paths exist.
+
+services:
+  smrt:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      args:
+        USER_UID: "${UID:-1000}"
+        USER_GID: "${GID:-1000}"
+    image: smrt:devcontainer
+    volumes:
+      # Vault: read-write. Defaults to a scratch vault inside the repo so a
+      # fresh clone opens without configuration.
+      - "${SMRT_VAULT:-../.devcontainer/.scratch-vault}:/vault"
+
+      # Subject: READ-ONLY, always. Defaults to the repo itself, which makes
+      # the toolkit its own first subject — a decent smoke test.
+      - "${SMRT_SUBJECT:-..}:/subject:ro"
+
+      # Credentials and Toad session history.
+      - "./.state/agents:/home/smrt/.claude"
+      - "./.state/toad:/home/smrt/.local/share/toad"
+    environment:
+      TERM: "${TERM:-xterm-256color}"
+      COLORTERM: truecolor
+      VAULT_ROOT: /vault
+      SUBJECT_ROOT: /subject
+      ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
+      OPENROUTER_API_KEY: "${OPENROUTER_API_KEY:-}"
+    command: sleep infinity
+    stdin_open: true
+    tty: true
