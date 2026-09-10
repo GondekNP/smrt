@@ -6,25 +6,78 @@ MCP server exposing the question types and the log/artifact plumbing.
 takes here is inherited by the design layer, so it's worth getting the tool
 signatures right before building much on top.
 
-> **PLACEHOLDER.** `vault_tools/server.py` defines the interface and every
-> handler raises `NotImplementedError`. The signatures are the thing worth
-> arguing about before any of it is real.
+> **`quiz` and `explain` are implemented; the other five are not.** Built on
+> the official MCP SDK (`mcp` 2.x) — `docs/OPEN.md` decision 8. Only the
+> implemented tools are registered: a stub in `tools/list` reads to the model
+> as a capability, and a tool that is visible and always raises costs a turn
+> to discover.
 
 ## Tools
 
 | Tool | Purpose |
 |---|---|
-| `quiz` | Multiple choice. Requires a pick **and** a one-line justification, graded separately. |
-| `explain` | Free response against a rubric committed before the question is shown. |
+| `quiz` | Pose multiple choice. Commits the answer key; returns only what the learner may see. |
+| `answer_quiz` | Grade it. Computes `pick_correct` itself; takes the agent's judgment only on the reason. |
+| `explain` | Pose free response, committing the rubric by hash first. |
+| `grade_explain` | Grade it, refusing any verdict that does not account for exactly the committed rubric. |
 | `derive` | Write a derivation note. Returns immediately; does not wait. |
 | `ask` | Genuine fork, no right answer. Never used for gradable content. |
 | `submit_artifact` | Read a submission — a note (resolving its `![[…]]` embeds) or a bare image. |
 | `record_grade` | Write grading back into the derivation's own note. |
 | `md_log` | Append to the session's markdown log in the vault. |
 
-Seven, not six: `record_grade` was split out once submissions became notes,
-because writing structured front matter back is a different job from appending
-to a transcript.
+Seven names, nine calls: `record_grade` was split out once submissions became
+notes, because writing structured front matter back is a different job from
+appending to a transcript — and `quiz` and `explain` each became two calls, for
+the reason below.
+
+## Why a question costs two calls
+
+**A tool call cannot ask the learner anything.** MCP is request/response, and
+the one mechanism that would change that — `elicitation` — is unreachable here:
+Toad 0.6.20 implements no handler for it, and `session/request_permission`, the
+only inbound method that asks the user something, offers a choice among options
+and so cannot carry a free-text justification.
+
+So the question is asked in the conversation, and these tools are **notaries
+and recorders**. One call poses and commits; a second grades and is checked
+against what was committed. `derive` reached this conclusion first — "nothing
+blocks" — and the reasoning simply had not been carried back to the other two.
+See `docs/status.md`, "The signature hole".
+
+## What is checked rather than trusted
+
+The documented failure mode of LLM grading is sycophancy, so the grade is split
+into the part that can be computed and the part that needs a model:
+
+| Checked by the tool | Trusted to the agent |
+|---|---|
+| `pick_correct` — a string comparison against the committed key. `answer_quiz` takes no such argument, so it cannot be reported wrongly. | `reason_correct` — was the justification sound. For a wrong pick, read it as *coherent*: a position someone could hold, rather than noise. That distinction separates a misconception from a gap. |
+| That `hit` and `missed` together account for **exactly** the committed rubric — nothing invented, nothing dropped. Without it, an agent looking at a weak answer could grade against a rubric it had quietly softened, and the published hash would still match. | Which rubric items the prose actually hit. |
+
+Two smaller ones: a question cannot be answered twice (re-answering lets a
+learner converge by elimination, destroying the signal), and the posing call's
+return withholds the key — tool results are rendered in the client's UI, so
+anything returned should be assumed immediately visible.
+
+`quiz` also lints its options against the tells in `docs/teaching-loop.md` —
+justification words inside an option, the correct option running longer than
+the mean distractor, asymmetric bolding — and returns them as `warnings`.
+Warnings rather than refusals: a false positive must never cost a lesson, and
+the documented fix is "regenerate, don't patch", which is the agent's call.
+
+## Tests
+
+```bash
+pixi run test-tools
+```
+
+Two suites. `tests/test_tools.py` calls the functions directly and covers the
+grading; `tests/test_stdio.py` drives a real client against a real server over
+stdio. The second earned its place immediately — it caught the SDK withholding
+refusal text from the client, so every carefully worded refusal reached the
+model as `Error executing tool grade_explain`. Refusals are `ToolError` now,
+which the SDK relays; the direct-call tests could never have seen it.
 
 ## The derive loop
 
@@ -101,7 +154,12 @@ In-container. `docs/OPEN.md` decision 3.
 
 ## TODO
 
-- [ ] Pick an MCP SDK and implement for real
+- [x] Pick an MCP SDK — official `mcp` 2.x, decided 2026-09-10, decision 8
+- [x] Implement `quiz` and `explain`, both as pose + grade pairs
+- [ ] `derive`, and the note plumbing it needs
+- [ ] Does `ask` need to exist at all? It was specified to *return* the
+      learner's choice, which is not possible here; as a recorder it may be
+      indistinguishable from the agent simply asking
 - [x] Rubric visibility for `explain` — same rule as `derive`: hash committed
       before, plaintext after. Decided 2026-09-08.
 - [ ] `md_log` — one file per session, or append to a daily note?

@@ -29,7 +29,10 @@ not listed as verified should be assumed untested.
 | `session/cancel` | cancelled mid-stream through the proxy; agent answered `stopReason: cancelled` in 7 ms |
 | Toad compat shim | A/B/C: Toad rejects the frame direct and with `--no-compat`, accepts it repaired |
 | Load | 206 frames / 129 KB / 225 s in one session; largest frame 31 KB |
+| `quiz` / `explain` | implemented as pose + grade pairs; refusals verified over stdio |
+| `vault-tools` | serves MCP through the wrapper on `PATH`, spawned as a client spawns it |
 | Proxy tests | 47/47, in the image (Python 3.14) and on the host (3.10) |
+| Tool tests | 39/39, in the image (the MCP SDK is not a host dependency) |
 | shellcheck | zero errors across `bin/smrt`, `scripts/`, `docker/` |
 
 The read-only enforcement is the claim the project rests on, and it survived
@@ -121,8 +124,12 @@ failure `OPEN.md` decision 4 is about, one layer up from where it was fixed.
   `tool_call` updates, not as `fs/write_text_file`.
 - **`session/load`.** Injection covers it, but Toad 0.6.20 exposes no resume
   command, so it has not been exercised live.
-- **Every question type.** All seven handlers raise `NotImplementedError`.
-- **The teaching loop.** Cannot run until the tool server does.
+- **The question types in a live session.** `quiz` and `explain` are
+  implemented and tested, but no model has yet posed one. `derive`, `ask`,
+  `submit_artifact`, `record_grade` and `md_log` still raise
+  `NotImplementedError` and are deliberately unregistered.
+- **The teaching loop.** Two of its four question types now work; the loop
+  itself needs the `teach` skill, which is still a placeholder.
 - **Token refresh across a bind mount.** Unknown. First suspect if a long
   session drops its auth.
 - **The `teach` skill itself.** Still a placeholder; the real version is
@@ -140,11 +147,11 @@ point is still not started.
 3. ~~**`session/new` injection.**~~ Done 2026-09-09. The tool server is
    unblocked; nothing about the teaching loop is waiting on infrastructure any
    more.
-4. **Implement `quiz` and `explain`.** The two that gate everything else.
-   `derive` needs the note plumbing, `ask` is trivial. The SDK is settled --
-   official `mcp` 2.1.1, `OPEN.md` decision 8, in the image and verified --
-   so what remains is the tool surface, and the documented signatures cannot
-   be implemented as written. See "The signature hole" below.
+4. ~~**Pick an MCP SDK; implement `quiz` and `explain`.**~~ Done 2026-09-10.
+   Official `mcp` 2.1.1 (`OPEN.md` decision 8); both implemented as pose +
+   grade pairs; 39 tests. **Not yet exercised by a model** -- one live session
+   through the proxy with `--mcp vault-tools=vault-tools` is the remaining
+   check, and the first thing to do next.
    Use `SMRT_TOOLS=./tools smrt` so each edit doesn't cost an image rebuild
    (and `SMRT_PROXY_SRC=./proxy` for the proxy).
 5. **Rewrite the `teach` skill** for how you actually learn. Do not ship the
@@ -217,20 +224,40 @@ answer. What remains is the tool as **notary and recorder**: the question is
 asked in the conversation, and the tools exist to make the pre-commitment
 verifiable and the record durable.
 
-This is worth getting right rather than guessing, because the tool server is
-the only component shared between L0 and L1, and it is item 6's deliverable.
-The remaining fork is how many calls a question costs and who grades what:
+**Resolved 2026-09-10: two calls, and the tool grades what can be computed.**
+`quiz` poses and commits the key; `answer_quiz` computes `pick_correct` itself
+and takes the agent's judgment only on the reason. `explain` commits the rubric
+by hash; `grade_explain` refuses any verdict that does not account for exactly
+the committed rubric -- nothing invented, nothing dropped. So the four-outcome
+table has a leg the agent cannot move, and a rubric cannot be softened once the
+answer is in view.
 
-- **One call, agent grades.** `quiz` records the commitment and returns the
-  question to show; a second call records the agent's grading. Simple, but
-  every part of the grade is the agent's word.
-- **Two calls, tool grades what it can.** `quiz` records and returns the
-  question; `answer_quiz(id, pick, reason)` computes `pick_correct` itself --
-  that comparison is deterministic and therefore uncheatable -- and takes the
-  agent's judgment only for `reason_correct`. This is the version where the
-  four-outcome table has a leg the agent cannot move, and it interacts with
-  the still-open question of whether `quiz` grades the justification with a
-  model.
+### Two things that only showed up on the wire
+
+Both would have shipped silently, and both were caught by the stdio suite
+rather than the direct-call one -- which is the argument for having two.
+
+**The SDK withholds refusal text.** It reports the message of an anticipated
+failure (`ToolError`) to the client and suppresses anything else as a crash
+whose internals should not leak. A good default, and it made every refusal
+useless: "grade against the rubric as committed, quoting items verbatim"
+reached the model as `Error executing tool grade_explain`. Refusals are
+`ToolError` now. In these tools the message *is* the mechanism, so this was not
+cosmetic.
+
+**An MCP server does not inherit the environment.** The Python SDK's stdio
+client passes only `HOME`, `PATH` and `TERM`, so the image's `PYTHONPATH` was
+gone and `python3 -m vault_tools.server` could not find its own package -- the
+client saw `Connection closed` and nothing more. Each wrapper in
+`.local/bin` now sets its own `PYTHONPATH`. Claude Code's client does pass it
+through today, which is why `smrt-mcp-probe` worked live, but depending on that
+is depending on someone else's allowlist.
+
+The regression test for the second one is worth a note, because its first
+version passed against the broken wrapper: `python3 -m` puts the working
+directory on `sys.path`, and the suite runs from the tools directory. A real
+server is spawned with the *session's* cwd, so the test has to pass `cwd="/"`
+to discriminate. Verified failing against the old wrapper before being kept.
 
 ## Known constraints, accepted
 
