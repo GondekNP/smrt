@@ -1,0 +1,26 @@
+[project]
+name = "smrt-acp-proxy"
+version = "0.1.0"
+description = "Transparent ACP proxy: forwards JSON-RPC between an ACP client and an ACP agent."
+# 3.10 because that is what the offline test suite actually runs on, so the
+# tests stay usable on a host without the container's 3.14.
+requires-python = ">=3.10"
+dependencies = [
+    # None, and that is deliberate. The proxy speaks the wire directly rather
+    # than through an ACP SDK: the whole point of step 1 is that unknown
+    # methods and unknown fields pass through untouched, and a typed SDK model
+    # would have to be taught every one of them.
+]
+
+[project.scripts]
+smrt-acp-proxy = "acp_proxy.__main__:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+# Not installed in the image. It sits on PYTHONPATH beside tools/, and
+# docker/Dockerfile writes a small exec wrapper onto PATH — which keeps
+# SMRT_PROXY_SRC live-mounting working, since an installed copy would shadow
+# the mount. This file exists so that stops being true the moment the proxy
+# earns real dependencies and its own locked environment.
