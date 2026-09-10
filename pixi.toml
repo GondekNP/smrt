@@ -40,6 +40,10 @@ cmd = "bash scripts/check.sh"
 description = "Run the ACP proxy's offline test suite in the image"
 cmd = "bash scripts/test-proxy.sh"
 
+[tasks.test-tools]
+description = "Run the vault tool server's test suite in the image"
+cmd = "bash scripts/test-tools.sh"
+
 [tasks.lint]
 description = "shellcheck the scripts"
 cmd = "shellcheck bin/smrt scripts/*.sh docker/*.sh .devcontainer/*.sh"

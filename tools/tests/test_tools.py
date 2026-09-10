@@ -1,0 +1,311 @@
+"""Does the grading hold when the agent is wrong about it? It must.
+
+The two checks worth testing are the ones the agent cannot perform on its own
+behalf: `answer_quiz` computing `pick_correct` itself, and `grade_explain`
+refusing a verdict that does not account for exactly the committed rubric.
+Everything else here is input validation, which matters mainly because a
+confusing refusal costs a turn in a live session.
+
+Refusals are `ToolError` rather than `ValueError` on purpose: the SDK relays
+only the text of an anticipated failure, and here the message is the mechanism.
+
+Stdlib `unittest`, but not stdlib-only: importing the server imports the MCP
+SDK, so this runs in the image (`scripts/test-tools.sh`), not on a bare host.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import unittest
+
+from mcp.server.mcpserver.exceptions import ToolError
+
+from vault_tools import server
+from vault_tools.server import (
+    QuizOption,
+    answer_quiz,
+    explain,
+    grade_explain,
+    quiz,
+)
+
+
+class Base(unittest.TestCase):
+    def setUp(self) -> None:
+        server._QUIZZES.clear()
+        server._EXPLAINS.clear()
+
+    def pose(self, **over):
+        kwargs = dict(
+            prompt="Which estimator is the sample mean?",
+            options=[
+                QuizOption(id="a", text="the MLE of a normal mean"),
+                QuizOption(id="b", text="the MLE of a normal variance"),
+            ],
+            correct_option_id="a",
+            explanation="The mean maximizes the normal likelihood.",
+        )
+        kwargs.update(over)
+        return quiz(**kwargs)
+
+
+class TestQuizValidation(Base):
+    def test_one_option_is_refused(self) -> None:
+        with self.assertRaisesRegex(ToolError, "at least two"):
+            self.pose(options=[QuizOption(id="a", text="only")])
+
+    def test_duplicate_option_ids_are_refused(self) -> None:
+        with self.assertRaisesRegex(ToolError, "duplicate option ids"):
+            self.pose(options=[QuizOption(id="a", text="x"),
+                               QuizOption(id="a", text="y")])
+
+    def test_correct_option_must_exist(self) -> None:
+        with self.assertRaisesRegex(ToolError, "not one of"):
+            self.pose(correct_option_id="z")
+
+    def test_explanation_is_required(self) -> None:
+        """The options are forbidden to carry reasoning, so if the explanation
+        is empty the reasoning exists nowhere at all."""
+        with self.assertRaisesRegex(ToolError, "explanation is required"):
+            self.pose(explanation="   ")
+
+
+class TestQuizPosing(Base):
+    def test_the_answer_key_is_not_in_the_payload(self) -> None:
+        """Tool results are rendered in the client's UI, so anything returned
+        here should be assumed visible to the learner immediately."""
+        posed = self.pose()
+        rendered = repr(posed)
+        self.assertNotIn("correct_option_id", rendered)
+        self.assertNotIn("maximizes the normal likelihood", rendered)
+
+    def test_ids_are_distinct_across_questions(self) -> None:
+        self.assertNotEqual(self.pose().question_id, self.pose().question_id)
+
+
+class TestOptionLint(Base):
+    """The tells `docs/teaching-loop.md` names, checked mechanically. Warnings
+    rather than errors: a false positive must never cost a lesson."""
+
+    def test_a_clean_question_warns_about_nothing(self) -> None:
+        self.assertEqual(self.pose().warnings, [])
+
+    def test_justification_inside_an_option_is_flagged(self) -> None:
+        posed = self.pose(options=[
+            QuizOption(id="a", text="the mean, because it maximizes the likelihood"),
+            QuizOption(id="b", text="the variance"),
+        ])
+        self.assertTrue(any("because" in w for w in posed.warnings))
+
+    def test_the_correct_option_being_longest_is_flagged(self) -> None:
+        """The number one giveaway, per rule 1."""
+        posed = self.pose(options=[
+            QuizOption(id="a", text="the maximum likelihood estimator of the "
+                                    "mean of a normal distribution with known "
+                                    "variance"),
+            QuizOption(id="b", text="the median"),
+            QuizOption(id="c", text="the mode"),
+        ])
+        self.assertTrue(any("mean distractor length" in w for w in posed.warnings))
+
+    def test_asymmetric_bolding_is_flagged(self) -> None:
+        posed = self.pose(options=[
+            QuizOption(id="a", text="the **mean**"),
+            QuizOption(id="b", text="the variance"),
+        ])
+        self.assertTrue(any("bolding" in w for w in posed.warnings))
+
+    def test_symmetric_bolding_is_not_flagged(self) -> None:
+        posed = self.pose(options=[
+            QuizOption(id="a", text="the **mean**"),
+            QuizOption(id="b", text="the **variance**"),
+        ])
+        self.assertEqual(posed.warnings, [])
+
+
+class TestAnswerQuiz(Base):
+    def test_pick_correct_is_computed_not_accepted(self) -> None:
+        """The whole point: `answer_quiz` takes no `pick_correct` argument, so
+        a sycophantic agent has no way to report a wrong pick as right."""
+        import inspect
+
+        self.assertNotIn("pick_correct",
+                         inspect.signature(answer_quiz).parameters)
+
+        posed = self.pose()
+        wrong = answer_quiz(posed.question_id, pick="b",
+                            reason="variance feels right", reason_correct=False)
+        self.assertFalse(wrong.pick_correct)
+
+    def test_the_four_outcomes_match_the_documented_table(self) -> None:
+        cases = {
+            ("a", True): "solid",
+            ("a", False): "lucky_guess",
+            ("b", True): "misconception",
+            ("b", False): "gap",
+        }
+        for (pick, reason_ok), expected in cases.items():
+            posed = self.pose()
+            result = answer_quiz(posed.question_id, pick=pick,
+                                 reason="a reason", reason_correct=reason_ok)
+            self.assertEqual(result.diagnosis, expected,
+                             f"pick={pick} reason_correct={reason_ok}")
+            self.assertTrue(result.next_step)
+
+    def test_the_explanation_is_released_only_now(self) -> None:
+        posed = self.pose()
+        result = answer_quiz(posed.question_id, pick="a", reason="r",
+                             reason_correct=True)
+        self.assertIn("maximizes the normal likelihood", result.explanation)
+
+    def test_a_question_cannot_be_answered_twice(self) -> None:
+        """Re-answering would let a learner converge by elimination, which
+        destroys the signal the question was posed to collect."""
+        posed = self.pose()
+        answer_quiz(posed.question_id, pick="b", reason="r", reason_correct=False)
+        with self.assertRaisesRegex(ToolError, "already been answered"):
+            answer_quiz(posed.question_id, pick="a", reason="r",
+                        reason_correct=True)
+
+    def test_unknown_question_id_says_what_is_known(self) -> None:
+        posed = self.pose()
+        with self.assertRaises(ToolError) as caught:
+            answer_quiz("quiz-nope", pick="a", reason="r", reason_correct=True)
+        self.assertIn(posed.question_id, str(caught.exception))
+
+    def test_a_pick_outside_the_options_is_refused(self) -> None:
+        posed = self.pose()
+        with self.assertRaisesRegex(ToolError, "not one of"):
+            answer_quiz(posed.question_id, pick="z", reason="r",
+                        reason_correct=True)
+
+    def test_a_blank_reason_is_refused(self) -> None:
+        """A pick without a justification is the plain multiple choice this
+        tool exists to avoid."""
+        posed = self.pose()
+        with self.assertRaisesRegex(ToolError, "reason is required"):
+            answer_quiz(posed.question_id, pick="a", reason="  ",
+                        reason_correct=True)
+
+
+RUBRIC = [
+    "states that the score has mean zero",
+    "differentiates the log-likelihood twice",
+    "identifies the negative expected Hessian",
+]
+
+
+class TestExplain(Base):
+    def test_a_rubric_is_required(self) -> None:
+        with self.assertRaisesRegex(ToolError, "rubric is required"):
+            explain("Why is Fisher information the negative expected Hessian?", [])
+
+    def test_duplicate_and_blank_items_are_refused(self) -> None:
+        with self.assertRaisesRegex(ToolError, "duplicate rubric items"):
+            explain("q", ["same", "same"])
+        with self.assertRaisesRegex(ToolError, "must not be blank"):
+            explain("q", ["real", "  "])
+
+    def test_the_rubric_is_not_in_the_payload_but_its_hash_is(self) -> None:
+        posed = explain("Why the negative expected Hessian?", RUBRIC)
+        rendered = repr(posed)
+        for item in RUBRIC:
+            self.assertNotIn(item, rendered)
+        self.assertEqual(posed.rubric_items, 3)
+        self.assertEqual(len(posed.rubric_sha256), 64)
+
+    def test_the_hash_is_reproducible_by_hand(self) -> None:
+        """A learner who cannot verify the hash themselves is taking the
+        pre-commitment on faith, which defeats it. One item per line, so
+        `sha256sum` reproduces this."""
+        posed = explain("q", RUBRIC)
+        expected = hashlib.sha256("\n".join(RUBRIC).encode("utf-8")).hexdigest()
+        self.assertEqual(posed.rubric_sha256, expected)
+
+
+class TestGradeExplain(Base):
+    def pose(self):
+        return explain("Why the negative expected Hessian?", RUBRIC)
+
+    def test_a_complete_partition_grades(self) -> None:
+        posed = self.pose()
+        result = grade_explain(posed.question_id, answer="because curvature",
+                               hit=RUBRIC[:2], missed=RUBRIC[2:])
+        self.assertEqual(result.hit, RUBRIC[:2])
+        self.assertEqual(result.missed, RUBRIC[2:])
+        self.assertFalse(result.passed)
+        self.assertEqual(result.rubric, RUBRIC)
+        self.assertEqual(result.rubric_sha256, posed.rubric_sha256)
+
+    def test_everything_hit_passes(self) -> None:
+        posed = self.pose()
+        result = grade_explain(posed.question_id, answer="a good answer",
+                               hit=RUBRIC, missed=[])
+        self.assertTrue(result.passed)
+        self.assertIn("advance", result.next_step.lower())
+
+    def test_an_invented_rubric_item_is_refused(self) -> None:
+        """The check that makes the pre-commitment real: an agent looking at a
+        weak answer cannot grade against a rubric it softened, because the
+        softened items are not the committed ones."""
+        posed = self.pose()
+        with self.assertRaisesRegex(ToolError, "not in the committed rubric"):
+            grade_explain(posed.question_id, answer="hand-wavy",
+                          hit=["mentioned curvature, close enough"],
+                          missed=[])
+
+    def test_a_dropped_rubric_item_is_refused(self) -> None:
+        """Silently omitting the item the answer missed would be the same
+        softening by subtraction."""
+        posed = self.pose()
+        with self.assertRaisesRegex(ToolError, "neither hit nor missed"):
+            grade_explain(posed.question_id, answer="partial",
+                          hit=RUBRIC[:1], missed=[])
+
+    def test_an_item_in_both_lists_is_refused(self) -> None:
+        posed = self.pose()
+        with self.assertRaisesRegex(ToolError, "both hit and missed"):
+            grade_explain(posed.question_id, answer="a",
+                          hit=RUBRIC, missed=RUBRIC[:1])
+
+    def test_grading_twice_is_refused(self) -> None:
+        posed = self.pose()
+        grade_explain(posed.question_id, answer="a", hit=RUBRIC, missed=[])
+        with self.assertRaisesRegex(ToolError, "already been graded"):
+            grade_explain(posed.question_id, answer="a", hit=RUBRIC, missed=[])
+
+    def test_a_blank_answer_is_refused(self) -> None:
+        posed = self.pose()
+        with self.assertRaisesRegex(ToolError, "answer is required"):
+            grade_explain(posed.question_id, answer="", hit=RUBRIC, missed=[])
+
+
+class TestSurface(unittest.TestCase):
+    def test_check_sh_still_sees_all_seven_documented_names(self) -> None:
+        """`scripts/check.sh` reports the surface by `hasattr`, and the five
+        unimplemented tools stay as module-level functions partly for that."""
+        for name in ("quiz", "explain", "derive", "ask",
+                     "submit_artifact", "record_grade", "md_log"):
+            self.assertTrue(hasattr(server, name), name)
+
+    def test_only_the_implemented_tools_are_registered(self) -> None:
+        """A stub in `tools/list` reads to the model as a capability."""
+        self.assertEqual(server.IMPLEMENTED,
+                         ("quiz", "answer_quiz", "explain", "grade_explain"))
+        for name in server.PLACEHOLDERS:
+            with self.assertRaises(NotImplementedError):
+                getattr(server, name)(*_placeholder_args(name))
+
+
+def _placeholder_args(name: str):
+    return {
+        "derive": ("task", ["step"], "[[c]]"),
+        "ask": ("q",),
+        "submit_artifact": ("notes/x.md",),
+        "record_grade": ("notes/x.md", ["r"], ["r"], [], "c"),
+        "md_log": (server.LogSession(path=server.VAULT_ROOT / "log.md"), "x"),
+    }[name]
+
+
+if __name__ == "__main__":
+    unittest.main()
