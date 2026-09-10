@@ -1,0 +1,26 @@
+# Credentials and agent state — never commit
+.env
+.state/
+
+# Obsidian per-machine config
+.obsidian/
+vault-template/.obsidian/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+dist/
+build/
+
+# OS
+.DS_Store
+
+# pixi
+.pixi/
+
+# devcontainer scratch
+.devcontainer/.env
+.devcontainer/.state/
+.devcontainer/.scratch-vault/

@@ -1,0 +1,10 @@
+.git
+.state
+.env
+vault-template
+docs
+README.md
+__pycache__
+*.egg-info
+.pixi
+pixi.lock
