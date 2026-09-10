@@ -1,0 +1,15 @@
+[project]
+name = "vault-tools"
+version = "0.0.1"
+description = "MCP server for the L0 vault: quiz, explain, derive, ask, artifacts, logging."
+requires-python = ">=3.11"
+dependencies = [
+    # TODO: pick an MCP SDK. Placeholder implementation has no deps.
+]
+
+[project.scripts]
+vault-tools = "vault_tools.server:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
