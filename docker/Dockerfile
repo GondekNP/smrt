@@ -82,8 +82,13 @@ RUN curl -fsSL https://pixi.sh/install.sh | bash
 # Toad is published on conda-forge, so pixi installs it directly and no
 # separate interpreter management is needed. Toad brings its own Python; the
 # explicit python install is for the vault tool server.
+# `--with mcp` adds the MCP SDK to that python environment without exposing any
+# of its executables. This is why the vault tool server can stay on PYTHONPATH
+# with no environment of its own: pixi's python has no pip, and the obvious
+# alternative -- a separate pixi manifest under tools/ -- would collide with
+# the SMRT_TOOLS live mount that makes iterating on the server free.
 RUN pixi global install batrachian-toad \
-    && pixi global install "python=${PYTHON_VERSION}"
+    && pixi global install "python=${PYTHON_VERSION}" --with mcp
 
 # --- agents ----------------------------------------------------------------
 # Split into its own script because these move fast, and it sits near the
@@ -96,9 +101,9 @@ RUN bash /tmp/install-agents.sh && rm /tmp/install-agents.sh
 # quiz / explain / derive / ask / submit_artifact / record_grade / md_log.
 # The only component shared between L0 and L1.
 #
-# On PYTHONPATH rather than installed, because it's a placeholder with no
-# dependencies. When it grows real ones, give it its own locked pixi manifest
-# and `pixi install` it here instead.
+# On PYTHONPATH rather than installed. Its one dependency, the MCP SDK, is in
+# the global python environment above -- so this stays a plain source copy that
+# SMRT_TOOLS can shadow, and editing a tool costs no rebuild.
 COPY --chown=${USER_UID}:${USER_GID} tools /workspace/tools
 
 # --- ACP proxy -------------------------------------------------------------

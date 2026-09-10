@@ -1,8 +1,9 @@
 # Open decisions
 
-Six decisions, three resolved on 2026-09-08 and recorded in place below.
-Decisions 4 and 5 were found while testing the L0 scaffold rather than while
-designing it.
+Eight decisions, all resolved and recorded in place below. Decisions 4 and 5
+were found while testing the L0 scaffold rather than while designing it, and 8
+was settled by measuring the candidates in the image rather than by reading
+about them.
 
 Resolve each by editing this file in place: strike the rejected options, keep
 the reasoning, and note the date. This file is the record of why the setup
@@ -303,15 +304,79 @@ Obsidian mobile on the same vault — open the note on the phone, attach, shoot 
 which needs the vault synced there and therefore touches decision 2. Webcam and
 other host-device access stay declined.
 
+## 8. MCP SDK — what the tool server is built on
+
+**Status: decided 2026-09-10. Chosen against a measurement, not a preference.**
+
+Left unforced on purpose until now: the `session/new` injection was proven with
+a hand-rolled probe server, so this could be decided once tools that matter got
+written, against wiring already known good.
+
+**Decided: the official Python SDK, `mcp` 2.1.1 from conda-forge.**
+
+Rejected: `fastmcp-slim` 4.0.3 — same ergonomics, 43 packages against 66, and
+none of the HTTP/OAuth surface. A genuinely reasonable choice, and it loses only
+because it is a third-party superset: when the question is "is this behaviour
+spec-correct", the reference implementation is the answer and a superset is not.
+
+Rejected: hand-rolling, extending `mcp_probe.py`. Tempting, because that server
+already speaks `initialize` / `tools/list` / `tools/call` / `ping` in 163 lines
+of stdlib and worked first try — so "the protocol is hard" is empirically false
+for a stdio server. It loses on the schemas, not the protocol.
+
+### What the measurement showed
+
+Three things, all checked in the image against Python 3.14 rather than assumed:
+
+**The dependency weight is not real.** The official SDK's dependency *list* is
+alarming for a stdio-only server — starlette, uvicorn, sse-starlette, typer,
+cryptography, pyjwt, opentelemetry, python-multipart, none of which we use. But
+solved, it is **18 MB more** than the slim alternative, on a 1.9 GB image. The
+list is scary; the cost is not.
+
+**The signatures we already wrote generate correct schemas.** A probe server
+built with the real `quiz` signature produced a proper `$defs/QuizOption` from
+`list[QuizOption]`, an `outputSchema` from `QuizResult`, and returned
+`structuredContent` alongside the text. `submit_artifact` returned a correct
+`image/png` content block, which is the fiddliest part of MCP to hand-build.
+
+**The docstrings reach the model verbatim.** A multi-paragraph docstring arrived
+as a 221-character tool description, dedented, em dash intact. This is the
+deciding fact. Those docstrings — "must be a BARE CLAIM", the distractor
+mutation rule, "if you can tell which option is right while cold, regenerate" —
+are already written, and they *are* the instructions that make the question
+types work. An SDK that turns them into tool descriptions for free means the
+design notes and the agent's prompt cannot drift apart. Hand-rolling means
+maintaining JSON Schema by hand beside dataclasses whose signatures are
+explicitly still under review in L0, which is precisely where silent drift
+would hurt most.
+
+### Two consequences
+
+**No restructuring.** The expectation was that a real dependency would force
+the tool server off `PYTHONPATH` into its own pixi environment — pixi's python
+has no pip, and `docker/Dockerfile` said as much. It does not:
+
+```dockerfile
+RUN pixi global install "python=${PYTHON_VERSION}" --with mcp
+```
+
+`--with` adds a library to the existing global environment without exposing
+executables. Verified: `python3` on PATH imports `mcp`, and
+`PYTHONPATH=/workspace/tools python3 -c "from vault_tools import server"` still
+works. So the `SMRT_TOOLS=./tools` live mount keeps working and no wrapper
+indirection appears.
+
+**`mcp` 2.x renamed the primary API.** `FastMCP` is now `MCPServer`, in
+`mcp.server.mcpserver`. Every v1 tutorial and every pre-2.x habit is wrong, and
+the package helpfully raises an `ImportError` saying so. It is also young —
+2.1.1 landed on conda-forge 2026-08-26. The mitigation is a pin, not vigilance.
+
 ## Still genuinely open
 
 - **Vault sync to phone**, which is what makes the `derive` loop actually short.
   Obsidian Sync, Syncthing, or self-hosted LiveSync. Interacts with decision 2:
   one vault means the phone carries every subject.
-- **Which MCP SDK** the tool server is built on. Unforced so far, on purpose:
-  the injection was proven with a hand-rolled probe server, so this gets
-  decided when tools that matter get written, against wiring already known
-  good.
 - **Whether to report Toad's `rawInput`/`rawOutput` annotation upstream.**
   Deferred deliberately on 2026-09-10 — we shimmed it locally rather than
   opening an issue on someone else's tracker without more confirmation. See

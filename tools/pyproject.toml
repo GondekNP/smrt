@@ -4,7 +4,11 @@ version = "0.0.1"
 description = "MCP server for the L0 vault: quiz, explain, derive, ask, artifacts, logging."
 requires-python = ">=3.11"
 dependencies = [
-    # TODO: pick an MCP SDK. Placeholder implementation has no deps.
+    # Official Python SDK, chosen on 2026-09-10 -- see docs/OPEN.md decision 8.
+    # Pinned to 2.x deliberately: 2.0 renamed FastMCP to MCPServer, so a
+    # resolver free to pick <2 would silently select an API this code does not
+    # use.
+    "mcp>=2.1,<3",
 ]
 
 [project.scripts]

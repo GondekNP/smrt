@@ -140,8 +140,11 @@ point is still not started.
 3. ~~**`session/new` injection.**~~ Done 2026-09-09. The tool server is
    unblocked; nothing about the teaching loop is waiting on infrastructure any
    more.
-4. **Pick an MCP SDK; implement `quiz` and `explain`.** The two that gate
-   everything else. `derive` needs the note plumbing, `ask` is trivial.
+4. **Implement `quiz` and `explain`.** The two that gate everything else.
+   `derive` needs the note plumbing, `ask` is trivial. The SDK is settled --
+   official `mcp` 2.1.1, `OPEN.md` decision 8, in the image and verified --
+   so what remains is the tool surface, and the documented signatures cannot
+   be implemented as written. See "The signature hole" below.
    Use `SMRT_TOOLS=./tools smrt` so each edit doesn't cost an image rebuild
    (and `SMRT_PROXY_SRC=./proxy` for the proxy).
 5. **Rewrite the `teach` skill** for how you actually learn. Do not ship the
@@ -191,9 +194,10 @@ nobody finds.
 
 ## Decisions
 
-Seven, all recorded in `OPEN.md` with reasoning. Four resolved on 2026-09-08
+Eight, all recorded in `OPEN.md` with reasoning. Four resolved on 2026-09-08
 (auth, engine, MCP attachment, probe phase, derive loop), one deferred
-deliberately (vault topology), one settled earlier (tool placement).
+deliberately (vault topology), one settled earlier (tool placement), and the
+MCP SDK settled on 2026-09-10 by measuring the candidates in the image.
 
 `.devcontainer/` is deliberately untouched and lags the launcher — the real
 entry point is `bin/smrt`. Its `post-create.sh` seeds from a path not present
