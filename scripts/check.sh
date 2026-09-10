@@ -36,7 +36,7 @@ docker run --rm "$IMAGE" bash -c '
 # actually invokes. The claude CLI has no ACP mode of its own, so without the
 # adapter Toad cannot reach Claude Code at all.
 for c in toad claude claude-agent-acp opencode \
-         smrt-acp-proxy smrt-mcp-probe \
+         smrt-acp-proxy smrt-mcp-probe vault-tools \
          pixi git rg python3; do
     if command -v "$c" >/dev/null 2>&1; then
         printf "  %-17s %s\n" "$c" "$(command -v "$c")"
@@ -54,13 +54,14 @@ if out=$(python3 -m acp_proxy --help 2>&1); then
 else
     printf "  %-17s BROKEN\n" "acp_proxy"
 fi
+# Registered and placeholder are reported separately on purpose: counting them
+# together read as "7/7 tools" while five of them raised NotImplementedError.
 python3 -c "
 import vault_tools.server as s
-want = (\"quiz\", \"explain\", \"derive\", \"ask\",
-        \"submit_artifact\", \"record_grade\", \"md_log\")
-have = [n for n in want if hasattr(s, n)]
-print(\"  %-17s %d/%d tools: %s\" % (\"vault_tools\", len(have), len(want),
-                                    \", \".join(have)))
+print(\"  %-17s %d registered: %s\" % (\"vault_tools\", len(s.IMPLEMENTED),
+                                      \", \".join(s.IMPLEMENTED)))
+print(\"  %-17s %d placeholder: %s\" % (\"\", len(s.PLACEHOLDERS),
+                                       \", \".join(s.PLACEHOLDERS)))
 " || printf "  %-17s BROKEN\n" "vault_tools"
 '
 

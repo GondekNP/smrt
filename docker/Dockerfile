@@ -119,14 +119,28 @@ ENV PYTHONPATH=/workspace/tools:/workspace/proxy
 # `pixi global` environment is asking for trouble, and an installed copy would
 # shadow the SMRT_PROXY_SRC live mount that makes iterating on the proxy free.
 # ~/.local/bin is already on PATH.
+#
+# Each wrapper sets its own PYTHONPATH rather than relying on the ENV above,
+# because an MCP server is spawned by a client that decides its environment.
+# The Python SDK's stdio client passes only HOME, PATH and TERM -- so
+# `python3 -m vault_tools.server` cannot find its own package, and the failure
+# surfaces to the client as a bare "Connection closed". Claude Code's client
+# does pass PYTHONPATH through today (the probe server worked live on it), but
+# depending on that is depending on someone else's allowlist.
 # smrt-mcp-probe gets one too, so `--mcp probe=smrt-mcp-probe` needs no nested
 # shell quoting inside `toad acp '...'`.
-RUN printf '#!/bin/sh\nexec python3 -m acp_proxy "$@"\n' \
+# vault-tools gets one for the same reason, and it is the command the proxy is
+# meant to inject:
+#   --mcp vault-tools=vault-tools
+RUN printf '#!/bin/sh\nexec env PYTHONPATH=/workspace/proxy python3 -m acp_proxy "$@"\n' \
         > /home/${USERNAME}/.local/bin/smrt-acp-proxy \
-    && printf '#!/bin/sh\nexec python3 -m acp_proxy.mcp_probe "$@"\n' \
+    && printf '#!/bin/sh\nexec env PYTHONPATH=/workspace/proxy python3 -m acp_proxy.mcp_probe "$@"\n' \
         > /home/${USERNAME}/.local/bin/smrt-mcp-probe \
+    && printf '#!/bin/sh\nexec env PYTHONPATH=/workspace/tools python3 -m vault_tools.server "$@"\n' \
+        > /home/${USERNAME}/.local/bin/vault-tools \
     && chmod +x /home/${USERNAME}/.local/bin/smrt-acp-proxy \
-                /home/${USERNAME}/.local/bin/smrt-mcp-probe
+                /home/${USERNAME}/.local/bin/smrt-mcp-probe \
+                /home/${USERNAME}/.local/bin/vault-tools
 
 # Toad is a Textual TUI. A capable terminal matters; the Toad README
 # specifically calls out that macOS Terminal.app gives a degraded experience.
