@@ -1,0 +1,49 @@
+# SMRT — task entry point.
+#
+# pixi holds the task names; bash holds the substance. Every task below is a
+# thin call into scripts/, so anything here is runnable directly without pixi
+# if you'd rather.
+#
+# Uses [workspace] (pixi >= 0.40). If you're on something older, rename it to
+# [project] — nothing else changes.
+
+[workspace]
+name = "smrt"
+version = "0.1.0"
+description = "Show My Reasoning Toolkit — Toad over a markdown vault, subjects mounted read-only"
+channels = ["conda-forge"]
+platforms = ["linux-64", "linux-aarch64", "osx-arm64", "osx-64"]
+
+[dependencies]
+# Host-side only. The container builds its own environment — see
+# docker/Dockerfile. Docker itself is not a conda package; the scripts shell
+# out to whatever docker is on PATH.
+shellcheck = "*"
+
+[tasks.build]
+description = "Build the vault image (UID/GID matched to host)"
+cmd = "bash scripts/build.sh"
+
+[tasks.rebuild]
+description = "Build without cache"
+cmd = "bash scripts/build.sh --no-cache"
+
+# Launching is bin/smrt, not a pixi task — you'll want it on PATH and usable
+# from any directory, and a pixi task would tie it to this repo's cwd.
+#   ln -s "$PWD/bin/smrt" ~/.local/bin/smrt
+
+[tasks.check]
+description = "Report what actually landed in the image"
+cmd = "bash scripts/check.sh"
+
+[tasks.test-proxy]
+description = "Run the ACP proxy's offline test suite in the image"
+cmd = "bash scripts/test-proxy.sh"
+
+[tasks.lint]
+description = "shellcheck the scripts"
+cmd = "shellcheck bin/smrt scripts/*.sh docker/*.sh .devcontainer/*.sh"
+
+[tasks.clean]
+description = "Remove the image"
+cmd = "bash scripts/clean.sh"
