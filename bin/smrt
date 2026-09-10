@@ -1,0 +1,274 @@
+#!/usr/bin/env bash
+# smrt — Show My Reasoning Toolkit
+#
+# Launches Toad in a container with your vault mounted read-write and a
+# subject directory mounted READ-ONLY.
+#
+#   smrt                      subject = $PWD, vault = $SMRT_VAULT
+#   smrt ~/code/thing         subject = that directory
+#   smrt --no-subject         vault only
+#   smrt --vault ~/other      override the vault for this run
+#   smrt --shell              bash instead of toad
+#   smrt -- <cmd...>          run something else entirely
+#
+# Config resolution, first hit wins:
+#   1. flags
+#   2. environment (SMRT_VAULT, SMRT_IMAGE, SMRT_STATE, SMRT_DOCKER_CONTEXT)
+#   3. ~/.config/smrt/config
+#   4. defaults (~/vault, smrt:latest, ~/.local/share/smrt, docker context
+#      "default")
+#
+# Engine requirement: SMRT needs a docker engine that serves bind mounts with
+# host ownership intact. Docker Desktop on Linux does NOT — see the preflight
+# below. Set SMRT_DOCKER_CONTEXT to override, SMRT_SKIP_PREFLIGHT=1 to skip
+# the probe, SMRT_REPROBE=1 to re-run a cached probe.
+#
+# Auth: container-scoped by default — log in once inside the container and the
+# session persists in $SMRT_STATE, never touching your host config.
+# SMRT_HOST_AUTH=1 instead reuses the host's own Claude Code session.
+#
+# SMRT_TOOLS=<dir> live-mounts the tool server so you can edit it without
+# rebuilding the image; SMRT_PROXY_SRC=<dir> does the same for the ACP proxy.
+#
+# The ACP proxy is never in the path of a normal launch. Reach it explicitly:
+#   smrt -- toad acp 'smrt-acp-proxy --backend opencode' /vault
+
+set -euo pipefail
+
+CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}/smrt/config"
+
+# Sourcing the config file would otherwise overwrite anything already set in
+# the environment, inverting the documented precedence above. Stash the
+# environment's values first and put them back afterwards.
+_env_vault="${SMRT_VAULT:-}"
+_env_image="${SMRT_IMAGE:-}"
+_env_state="${SMRT_STATE:-}"
+_env_ctx="${SMRT_DOCKER_CONTEXT:-}"
+
+# shellcheck disable=SC1090
+[ -f "$CONFIG" ] && . "$CONFIG"
+
+VAULT="${_env_vault:-${SMRT_VAULT:-$HOME/vault}}"
+IMAGE="${_env_image:-${SMRT_IMAGE:-smrt:latest}}"
+STATE="${_env_state:-${SMRT_STATE:-${XDG_DATA_HOME:-$HOME/.local/share}/smrt}}"
+
+# Pinned, not ambient. Whichever context happens to be active is not a safe
+# input: the mount semantics SMRT depends on differ between engines.
+DOCKER_CTX="${_env_ctx:-${SMRT_DOCKER_CONTEXT:-default}}"
+export DOCKER_CONTEXT="$DOCKER_CTX"
+
+SUBJECT="$PWD"
+USE_SUBJECT=1
+CMD=()
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --vault)      VAULT="$2"; shift 2 ;;
+        --image)      IMAGE="$2"; shift 2 ;;
+        --no-subject) USE_SUBJECT=0; shift ;;
+        --shell)      CMD=(bash); shift ;;
+        -h|--help)    awk 'NR>1 && /^#/ {sub(/^# ?/,""); print; next} NR>1 {exit}' "$0"; exit 0 ;;
+        --)           shift; CMD=("$@"); break ;;
+        -*)           echo "unknown flag: $1" >&2; exit 2 ;;
+        *)            SUBJECT="$1"; shift ;;
+    esac
+done
+
+# --- vault -----------------------------------------------------------------
+if [ ! -d "$VAULT" ]; then
+    echo "Vault not found: $VAULT" >&2
+    echo "Set SMRT_VAULT, pass --vault, or create the directory." >&2
+    exit 1
+fi
+VAULT="$(cd "$VAULT" && pwd)"
+
+MOUNTS=(-v "$VAULT:/vault")
+
+# --- subject (always read-only) --------------------------------------------
+# The :ro flag is the enforcement. Not a prompt instruction — a mount flag.
+# An agent that cannot write cannot run ahead of you.
+if [ "$USE_SUBJECT" -eq 1 ] && [ -d "$SUBJECT" ]; then
+    SUBJECT="$(cd "$SUBJECT" && pwd)"
+    if [ "$SUBJECT" = "$VAULT" ]; then
+        echo "Subject is the vault; skipping the read-only mount."
+    else
+        MOUNTS+=(-v "$SUBJECT:/subject:ro")
+        echo "Subject: $SUBJECT (read-only)"
+    fi
+else
+    echo "No subject. Fine — the teaching loop works without one."
+fi
+
+# --- engine preflight ------------------------------------------------------
+# SMRT's whole model is a writable /vault and a read-only /subject. Docker
+# Desktop on Linux breaks the first half: it serves bind mounts over virtiofs
+# with ownership squashed to root, so the container user cannot write to the
+# vault at all — and the UID/GID build args that exist to prevent exactly that
+# become a silent no-op. On a host path not already in Desktop's file-sharing
+# set it is worse, and `docker run` hangs with the container stuck in Created.
+#
+# So this probes what the engine ACTUALLY does rather than matching on a
+# context name. That keeps the check meaningful on podman, rootless docker, or
+# anything else, instead of hardcoding one known-bad product.
+engine_fail() {
+    echo "" >&2
+    echo "SMRT preflight failed: $1" >&2
+    echo "" >&2
+    echo "  docker context : $DOCKER_CTX" >&2
+    echo "  vault          : $VAULT" >&2
+    echo "" >&2
+    echo "Available contexts:" >&2
+    # Unset, or this listing inherits the very context that just failed.
+    env -u DOCKER_CONTEXT docker context ls \
+        --format '{{.Name}}\t{{.DockerEndpoint}}' 2>/dev/null \
+        | sed 's/^/    /' >&2
+    echo "" >&2
+    echo "SMRT needs an engine that serves bind mounts with host ownership" >&2
+    echo "intact. Docker Desktop on Linux does not: it squashes them to root," >&2
+    echo "and on an unshared host path it hangs outright." >&2
+    echo "" >&2
+    echo "Fixes, in order of preference:" >&2
+    echo "  - point SMRT at a plain engine:  SMRT_DOCKER_CONTEXT=default smrt" >&2
+    echo "  - or persist it:  echo SMRT_DOCKER_CONTEXT=default >> \\" >&2
+    echo "      ${XDG_CONFIG_HOME:-$HOME/.config}/smrt/config" >&2
+    echo "  - bypass this check (you will hit permission errors):" >&2
+    echo "      SMRT_SKIP_PREFLIGHT=1 smrt" >&2
+    echo "" >&2
+    exit 1
+}
+
+mkdir -p "$STATE"
+
+if [ "${SMRT_SKIP_PREFLIGHT:-0}" != "1" ]; then
+    # These two are free (~0.01s) so they run every launch.
+    docker context inspect "$DOCKER_CTX" >/dev/null 2>&1 \
+        || engine_fail "docker context \"$DOCKER_CTX\" does not exist"
+
+    IMAGE_ID="$(docker image inspect --format '{{.Id}}' "$IMAGE" 2>/dev/null)" \
+        || engine_fail "image \"$IMAGE\" not found in this context (run: pixi run build)"
+    [ -n "$IMAGE_ID" ] \
+        || engine_fail "image \"$IMAGE\" not found in this context (run: pixi run build)"
+
+    # The write probe costs a container start (~0.3s), which is too much to pay
+    # on every launch for an answer that changes only when the engine, the
+    # vault path, or the image changes. So cache it against exactly those three
+    # and re-probe when any of them moves. SMRT_REPROBE=1 forces it — needed if
+    # you change Docker Desktop's file-sharing config, which is not something
+    # this key can see.
+    probe_key="$DOCKER_CTX|$VAULT|$IMAGE_ID"
+    probe_stamp="$STATE/preflight-ok"
+
+    if [ "${SMRT_REPROBE:-0}" = "1" ] \
+       || [ "$(cat "$probe_stamp" 2>/dev/null || true)" != "$probe_key" ]; then
+        # Timeout, because the Desktop failure mode is a hang, not an error.
+        probe=".smrt-write-probe.$$"
+        if ! timeout 60 docker run --rm -v "$VAULT:/vault" "$IMAGE" \
+                bash -c "touch /vault/$probe && rm -f /vault/$probe" >/dev/null 2>&1; then
+            rm -f "$VAULT/$probe" 2>/dev/null || true
+            engine_fail "the container cannot write to the mounted vault"
+        fi
+        printf '%s' "$probe_key" > "$probe_stamp"
+    fi
+fi
+
+# --- persistent state ------------------------------------------------------
+# Toad splits its own state across BOTH XDG dirs, and mounting only one of them
+# was a quiet bug: ~/.config/toad holds toad.json (UI settings), while session
+# history is a SQLite database at ~/.local/state/toad/toad.db. With just the
+# config dir mounted, settings persisted and scrollback did not.
+#
+# The XDG state dir is also where the ACP proxy writes its traces, and where
+# Toad writes its own [client]/[agent] transcript when TOAD_LOG is set — so one
+# mount makes all three readable from the host.
+mkdir -p "$STATE/toad" "$STATE/state"
+
+# --- agent auth ------------------------------------------------------------
+# Interactive tutoring is token-intensive enough that subscription pricing
+# decides this, so the goal is an OAuth session rather than a per-token key.
+# But the session is the CONTAINER'S OWN: you run `/login` inside it once, and
+# the credentials live in SMRT's state directory, never touching the host's.
+#
+# Two mounts, because Claude Code splits its state. Credentials go in
+# ~/.claude/, but onboarding state and project history go in ~/.claude.json,
+# which sits BESIDE that directory. Persist only the directory and you
+# re-onboard every launch.
+#
+# The .claude.json host file must be pre-created: bind-mounting a source that
+# does not exist makes Docker create a DIRECTORY there, and Claude Code then
+# fails on a file it cannot parse.
+if [ "${SMRT_HOST_AUTH:-0}" = "1" ]; then
+    # Opt-in: reuse the host's own Claude Code session. Convenient if you are
+    # already logged in on this machine and comfortable with the container
+    # reading your live token. Not the default, because it puts host
+    # credentials inside the container's reach.
+    if [ ! -d "$HOME/.claude" ]; then
+        echo "SMRT_HOST_AUTH=1 but no ~/.claude on the host." >&2
+        exit 1
+    fi
+    echo "Auth: host Claude Code session (SMRT_HOST_AUTH=1)."
+    MOUNTS+=(-v "$HOME/.claude:/home/smrt/.claude")
+    [ -f "$HOME/.claude.json" ] \
+        && MOUNTS+=(-v "$HOME/.claude.json:/home/smrt/.claude.json")
+else
+    mkdir -p "$STATE/agents"
+    [ -e "$STATE/claude.json" ] || echo '{}' > "$STATE/claude.json"
+    MOUNTS+=(-v "$STATE/agents:/home/smrt/.claude")
+    MOUNTS+=(-v "$STATE/claude.json:/home/smrt/.claude.json")
+    if [ ! -f "$STATE/agents/.credentials.json" ]; then
+        echo "Auth: container-scoped, not yet logged in." >&2
+        echo "  Run 'claude' in the container and use /login once; the session" >&2
+        echo "  persists in $STATE/agents and stays out of your host config." >&2
+    fi
+fi
+# Toad keeps its state in ~/.config/toad, NOT ~/.local/share/toad — confirmed
+# with `toad settings`, which prints the path it actually writes. Mounting the
+# XDG data dir instead meant nothing persisted at all.
+MOUNTS+=(-v "$STATE/toad:/home/smrt/.config/toad")
+MOUNTS+=(-v "$STATE/state:/home/smrt/.local/state")
+
+# --- live-mounted source, for development ----------------------------------
+# Both components are baked into the image, which means editing either one
+# normally costs a rebuild — the recorded downside of running them in-container
+# (OPEN.md decision 3). Point these at a checkout to shadow the baked copy and
+# iterate without rebuilding. Read-only, so the container still cannot alter
+# your working tree.
+live_mount() {
+    # $1 = env var name, $2 = its value, $3 = container path, $4 = label
+    if [ ! -d "$2" ]; then
+        echo "$1 is not a directory: $2" >&2
+        exit 1
+    fi
+    MOUNTS+=(-v "$(cd "$2" && pwd):$3:ro")
+    echo "$4: $2 (live, read-only)"
+}
+
+# if, not `[ … ] && …`: under `set -e` a trailing false test would exit.
+if [ -n "${SMRT_TOOLS:-}" ]; then
+    live_mount SMRT_TOOLS "$SMRT_TOOLS" /workspace/tools "Tools"
+fi
+if [ -n "${SMRT_PROXY_SRC:-}" ]; then
+    live_mount SMRT_PROXY_SRC "$SMRT_PROXY_SRC" /workspace/proxy "Proxy"
+fi
+
+# --- keys (secondary) ------------------------------------------------------
+# OAuth above covers interactive Claude Code. These are forwarded when present
+# for the other cases: OpenCode against non-Anthropic models, and the eventual
+# headless/CI path, which cannot use an OAuth session.
+ENVS=()
+for var in ANTHROPIC_API_KEY OPENROUTER_API_KEY OPENAI_API_KEY; do
+    [ -n "${!var:-}" ] && ENVS+=(-e "$var=${!var}")
+done
+
+[ ${#CMD[@]} -eq 0 ] && CMD=(toad /vault)
+
+exec docker run --rm -it \
+    --name "smrt-$$" \
+    "${MOUNTS[@]}" \
+    "${ENVS[@]}" \
+    -e "TERM=${TERM:-xterm-256color}" \
+    -e COLORTERM=truecolor \
+    -e VAULT_ROOT=/vault \
+    -e SUBJECT_ROOT=/subject \
+    -w /vault \
+    "$IMAGE" \
+    "${CMD[@]}"
