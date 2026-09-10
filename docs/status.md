@@ -182,6 +182,56 @@ nobody finds.
   must treat one `execute` as unknown-and-possibly-many rather than zero.
   Full detail in `docs/proxy.md`. Trigger: designing the gate.
 
+## The signature hole
+
+Found on 2026-09-10 while starting item 4, and it blocks writing `quiz` and
+`explain` as documented.
+
+**`quiz` cannot return what its signature promises.** It takes
+`(prompt, options, correct_option_id, explanation, hint)` and returns a
+`QuizResult` of `pick_correct` / `reason_correct` / `diagnosis` -- but the
+learner's answer is not among its arguments. Nothing in the inputs determines
+the outputs. `explain` has the same shape of problem: it takes
+`(question, rubric)` and its docstring says it "returns which rubric items were
+hit and which were missed", with no answer to grade.
+
+So the tools were specified as though they could block on the learner, and MCP
+is request/response. `derive` already faced this and resolved it explicitly --
+"Nothing blocks. MCP is request/response, so a `derive` that waited for a photo
+would wedge the session" -- but that reasoning was never carried back to `quiz`
+and `explain`.
+
+**Blocking is not available through this stack.** Worth checking rather than
+assuming, because MCP does have a mechanism for exactly this: `elicitation`, a
+server-initiated request for user input. It is in the ACP schema too
+(`elicitation/create` appears in the adapter's bundled SDK). But **Toad 0.6.20
+implements no elicitation handler** -- its inbound surface is the nine methods
+already measured (`session/update`, `session/request_permission`, `fs/*`,
+`terminal/*`) and `grep -ri elicit` over its source returns nothing. So even a
+perfect adapter has nowhere to send one. And `session/request_permission`,
+the one inbound method that does ask the user something, offers a choice among
+options -- it cannot carry a free-text justification.
+
+That rules out the shape where a tool call renders a question and returns the
+answer. What remains is the tool as **notary and recorder**: the question is
+asked in the conversation, and the tools exist to make the pre-commitment
+verifiable and the record durable.
+
+This is worth getting right rather than guessing, because the tool server is
+the only component shared between L0 and L1, and it is item 6's deliverable.
+The remaining fork is how many calls a question costs and who grades what:
+
+- **One call, agent grades.** `quiz` records the commitment and returns the
+  question to show; a second call records the agent's grading. Simple, but
+  every part of the grade is the agent's word.
+- **Two calls, tool grades what it can.** `quiz` records and returns the
+  question; `answer_quiz(id, pick, reason)` computes `pick_correct` itself --
+  that comparison is deterministic and therefore uncheatable -- and takes the
+  agent's judgment only for `reason_correct`. This is the version where the
+  four-outcome table has a leg the agent cannot move, and it interacts with
+  the still-open question of whether `quiz` grades the justification with a
+  model.
+
 ## Known constraints, accepted
 
 - **Docker Desktop does not work**, and SMRT refuses to start on it rather than
