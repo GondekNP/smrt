@@ -120,23 +120,38 @@ ENV PYTHONPATH=/workspace/tools:/workspace/proxy
 # shadow the SMRT_PROXY_SRC live mount that makes iterating on the proxy free.
 # ~/.local/bin is already on PATH.
 #
-# Each wrapper sets its own PYTHONPATH rather than relying on the ENV above,
-# because an MCP server is spawned by a client that decides its environment.
-# The Python SDK's stdio client passes only HOME, PATH and TERM -- so
-# `python3 -m vault_tools.server` cannot find its own package, and the failure
-# surfaces to the client as a bare "Connection closed". Claude Code's client
-# does pass PYTHONPATH through today (the probe server worked live on it), but
-# depending on that is depending on someone else's allowlist.
+# Each wrapper names an ABSOLUTE interpreter and sets its own PYTHONPATH,
+# rather than relying on the ENV above. An MCP server is spawned by a client
+# that decides its environment, and neither `python3` nor `PYTHONPATH` survives
+# that reliably:
+#
+#   - The Python SDK's stdio client passes only HOME, PATH and TERM.
+#   - There are three python3 binaries in this image and only ONE has the MCP
+#     SDK: the pixi `python` environment. Toad brings its own interpreter and
+#     Debian supplies a third, so whichever `python3` a client's PATH happens
+#     to resolve is a coin flip.
+#
+# Measured, not guessed: launched from Toad, the tool server died with
+# `ModuleNotFoundError: No module named 'mcp'` and the client reported only
+# "Connection failed (CONNECTION_CLOSED)". It worked from a different client in
+# the same image, which is what made it look like a code problem. The proxy and
+# the probe are stdlib-only, so they had been surviving the same coin flip --
+# that is why this surfaced with the first tool server that had a dependency.
+#
+# The build fails if that interpreter cannot import mcp, because the runtime
+# symptom is this uninformative.
 # smrt-mcp-probe gets one too, so `--mcp probe=smrt-mcp-probe` needs no nested
 # shell quoting inside `toad acp '...'`.
 # vault-tools gets one for the same reason, and it is the command the proxy is
 # meant to inject:
 #   --mcp vault-tools=vault-tools
-RUN printf '#!/bin/sh\nexec env PYTHONPATH=/workspace/proxy python3 -m acp_proxy "$@"\n' \
+RUN PY="/home/${USERNAME}/.pixi/envs/python/bin/python3" \
+    && "$PY" -c "import mcp" \
+    && printf '#!/bin/sh\nexec env PYTHONPATH=/workspace/proxy %s -m acp_proxy "$@"\n' "$PY" \
         > /home/${USERNAME}/.local/bin/smrt-acp-proxy \
-    && printf '#!/bin/sh\nexec env PYTHONPATH=/workspace/proxy python3 -m acp_proxy.mcp_probe "$@"\n' \
+    && printf '#!/bin/sh\nexec env PYTHONPATH=/workspace/proxy %s -m acp_proxy.mcp_probe "$@"\n' "$PY" \
         > /home/${USERNAME}/.local/bin/smrt-mcp-probe \
-    && printf '#!/bin/sh\nexec env PYTHONPATH=/workspace/tools python3 -m vault_tools.server "$@"\n' \
+    && printf '#!/bin/sh\nexec env PYTHONPATH=/workspace/tools %s -m vault_tools.server "$@"\n' "$PY" \
         > /home/${USERNAME}/.local/bin/vault-tools \
     && chmod +x /home/${USERNAME}/.local/bin/smrt-acp-proxy \
                 /home/${USERNAME}/.local/bin/smrt-mcp-probe \

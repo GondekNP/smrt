@@ -137,6 +137,33 @@ class TestTheWrapperOnPath(unittest.TestCase):
         self.assertIn("quiz",
                       drive(body, command="vault-tools", args=[], cwd="/"))
 
+    def test_serving_with_a_hostile_path(self) -> None:
+        """The wrapper must not depend on which `python3` a client's PATH finds.
+
+        This image has three: the pixi `python` environment (the only one with
+        the MCP SDK), Toad's own, and Debian's. Launched from Toad the server
+        died with `ModuleNotFoundError: No module named 'mcp'` while working
+        from another client in the same image -- and the client reported only
+        "Connection failed (CONNECTION_CLOSED)", which is why this is worth a
+        test rather than vigilance.
+
+        A PATH containing only the system directories is the worst case: it
+        finds a python3, and that python3 is wrong.
+        """
+        if shutil.which("vault-tools") is None:
+            self.skipTest("vault-tools is not on PATH (running outside the image?)")
+
+        async def body(session, _init):
+            return [t.name for t in (await session.list_tools()).tools]
+
+        self.assertIn("quiz", drive(
+            body,
+            command=shutil.which("vault-tools"),
+            args=[],
+            cwd="/",
+            env={"PATH": "/usr/bin:/bin", "HOME": os.environ.get("HOME", "")},
+        ))
+
 
 class TestRoundTrip(unittest.TestCase):
     def test_pose_then_answer_within_one_session(self) -> None:
