@@ -76,14 +76,21 @@ from pathlib import Path
 from mcp.server.mcpserver import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
 
+from . import trace
+
 VAULT_ROOT = Path(os.environ.get("VAULT_ROOT", "/vault"))
 SUBJECT_ROOT = Path(os.environ.get("SUBJECT_ROOT", "/subject"))
+
+# A tool server is spawned by the agent and its stdout is protocol, so the log
+# file is the only place to see what it was actually asked -- see trace.py.
+LOG = trace.Log()
 
 # Instructions travel to the client in `initialize` and are the one place to
 # state discipline that is not attached to a single tool.
 srv = MCPServer(
     "vault-tools",
     title="SMRT vault tools",
+    middleware=[trace.middleware(LOG)],
     instructions=(
         "Tools for a teaching session over an Obsidian vault. Questions are "
         "asked in the conversation, not by these tools: each question type is "
@@ -687,6 +694,7 @@ def main() -> None:
         print("  not implemented, not registered:")
         for name in PLACEHOLDERS:
             print(f"    - {name}")
+        print(f"  log          = {LOG.path}")
         return
 
     srv.run("stdio")

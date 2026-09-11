@@ -14,16 +14,19 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import shutil
 import sys
+import tempfile
 import unittest
+from pathlib import Path
 
 from mcp import ClientSession, StdioServerParameters, stdio_client
 
 TIMEOUT = 60
 
 
-def drive(body, command=None, args=None, cwd=None):
+def drive(body, command=None, args=None, cwd=None, env=None):
     """Run one client session against a freshly spawned server."""
 
     async def run():
@@ -31,6 +34,7 @@ def drive(body, command=None, args=None, cwd=None):
             command=command or sys.executable,
             args=args if command else ["-m", "vault_tools.server"],
             cwd=cwd,
+            env=env,
         )
         async with stdio_client(params) as (read, write):
             async with ClientSession(read, write) as session:
@@ -207,6 +211,56 @@ class TestRefusals(unittest.TestCase):
         self.assertTrue(failed(bad))
         self.assertIn("not one of", text(bad))
         self.assertTrue(good["question_id"].startswith("quiz-"))
+
+
+class TestTheCallLog(unittest.TestCase):
+    """The log is the only window into a server four processes down, and the
+    records worth having are the refusals — whether the model then corrects
+    itself is the question it exists to answer.
+
+    `env` is passed explicitly because the client decides the server's
+    environment and by default hands over only HOME, PATH and TERM: the same
+    sanitization that broke the wrapper silently drops SMRT_TOOLS_LOG.
+    """
+
+    def test_a_refusal_is_recorded_as_a_refusal(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "tools.jsonl"
+
+            async def body(session, _init):
+                await session.call_tool("explain", {"question": EXPLAIN_Q,
+                                                    "rubric": RUBRIC})
+                await session.call_tool("grade_explain", {
+                    "question_id": "explain-nope",
+                    "answer": "x", "hit": [], "missed": [],
+                })
+
+            drive(body, env={
+                "PATH": os.environ.get("PATH", ""),
+                "HOME": os.environ.get("HOME", ""),
+                "SMRT_TOOLS_LOG": str(path),
+            })
+
+            records = [json.loads(l) for l in
+                       path.read_text(encoding="utf-8").splitlines() if l.strip()]
+
+        calls = {r["tool"]: r for r in records if r["method"] == "tools/call"}
+        self.assertEqual(calls["explain"]["outcome"], "ok")
+        self.assertEqual(calls["grade_explain"]["outcome"], "refused")
+        self.assertIn("unknown question_id", calls["grade_explain"]["error"])
+        # The arguments are recorded, which is what makes a refusal diagnosable
+        # rather than merely visible.
+        self.assertEqual(calls["explain"]["arguments"]["rubric"], RUBRIC)
+
+    def test_logging_off_is_honoured(self) -> None:
+        async def body(session, _init):
+            return [t.name for t in (await session.list_tools()).tools]
+
+        self.assertIn("quiz", drive(body, env={
+            "PATH": os.environ.get("PATH", ""),
+            "HOME": os.environ.get("HOME", ""),
+            "SMRT_TOOLS_LOG": "off",
+        }))
 
 
 if __name__ == "__main__":

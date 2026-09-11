@@ -66,6 +66,33 @@ the mean distractor, asymmetric bolding — and returns them as `warnings`.
 Warnings rather than refusals: a false positive must never cost a lesson, and
 the documented fix is "regenerate, don't patch", which is the agent's call.
 
+## The call log
+
+A tool server is spawned by the agent, several processes down, and its stdout
+is protocol — so a file is the only place to see what it was actually asked.
+One JSONL record per inbound call, flushed, under the XDG state dir that
+`bin/smrt` mounts out of the container:
+
+```bash
+jq -r '[.outcome, .tool // .method, .error // ""] | @tsv' \
+  ~/.local/share/smrt/state/smrt/tools/tools-*.jsonl
+```
+
+`$SMRT_TOOLS_LOG` redirects it; `SMRT_TOOLS_LOG=off` turns it off. Note that a
+client decides its server's environment and hands over only `HOME`, `PATH` and
+`TERM` by default, so that variable has to be set deliberately rather than
+inherited.
+
+**The refusals are the records worth reading.** A refusal is the server telling
+the model it got the contract wrong; whether the model then corrects itself is
+the question this file exists to answer. They are logged as `refused` rather
+than `ok`, which took a fix: MCP reports a tool's own failure as a *successful*
+response carrying `isError`, so only protocol faults raise and every refusal
+initially logged as fine.
+
+**A log contains full question, rubric and answer-key content** — a debugging
+artifact, and not something to read mid-lesson if you mean to answer honestly.
+
 ## Tests
 
 ```bash
