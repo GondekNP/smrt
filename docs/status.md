@@ -157,6 +157,11 @@ point is still not started.
    check, and the first thing to do next.
    Use `SMRT_TOOLS=./tools smrt` so each edit doesn't cost an image rebuild
    (and `SMRT_PROXY_SRC=./proxy` for the proxy).
+4.5 **The vault's memory.** Two halves, both prerequisites for the skill:
+   *what there is to demonstrate* (the curriculum layer — canon, seeding and
+   audit are done for 18.06SC; 18.05, 18.655 and 6.438 still need importing)
+   and *what you have demonstrated* (the concept ledger, with the tiered
+   vocabulary rule — not started).
 5. **Rewrite the `teach` skill** for how you actually learn. Do not ship the
    source calibration.
 6. **Then, and only then**, judge whether the four question types are right.

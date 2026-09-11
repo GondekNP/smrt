@@ -1,6 +1,6 @@
 # Open decisions
 
-Eight decisions, all resolved and recorded in place below. Decisions 4 and 5
+Nine decisions, all resolved and recorded in place below. Decisions 4 and 5
 were found while testing the L0 scaffold rather than while designing it, and 8
 was settled by measuring the candidates in the image rather than by reading
 about them.
@@ -371,6 +371,53 @@ indirection appears.
 `mcp.server.mcpserver`. Every v1 tutorial and every pre-2.x habit is wrong, and
 the package helpfully raises an `ImportError` saying so. It is also young —
 2.1.1 landed on conda-forge 2026-08-26. The mitigation is a pin, not vigilance.
+
+## 9. The lesson DAG's node set — generated or imported
+
+**Status: decided 2026-09-11. Raised as a worry, not a proposal, and the worry
+was right.**
+
+The concern, as put: the agent generating the DAG from scratch is fine locally,
+but the *high-level structure* being invented is a vulnerability — the first
+generation might miss something a standard curriculum would have covered, that
+omission gets written into the vault, and every later session inherits it as
+fact.
+
+**Decided: import the node set, let the agent infer the edges.**
+
+The reason this is not a compromise is an asymmetry:
+
+| | From-scratch risk | Self-correcting? |
+|---|---|---|
+| **Node set** | High. Omissions are silent | **No.** Nothing points at the missing thing |
+| **Edges** | Lower. Wrong order is locally visible | **Yes.** A bad edge makes a confusing lesson |
+
+A wrong edge announces itself during teaching. A missing node never does,
+because nothing references it. And the vault is a durable record by design, so
+the omission is permanent and unaudited — structurally the same failure as a
+softened rubric, running the other direction.
+
+Source: **MIT OCW**, checked into this repo as TOML. Verified against
+ocw.mit.edu rather than recalled, which immediately earned itself: recall put
+measure-theoretic probability at 18.675 and the published course is 18.175.
+
+Three layers, and the separation is load-bearing:
+
+1. **Canon** — in the repo, cited, never edited by an agent. Structural rather
+   than promised: the agent works in `/vault` and the canon is not there.
+2. **Relevance** — per vault, jointly authored, enum plus prose. The enum makes
+   coverage countable; the prose makes it true, because the useful judgment is
+   usually "cover, but reframe" and no enum holds that.
+3. **Evidence** — existing `derive` wikilinks pointed at curriculum topics.
+
+`relevance: unset` is the default so that holes exist as data on day one rather
+than being discovered by their absence.
+
+**Also decided, as a rule and deliberately not enforced in code:** prefer
+importing another standard over generating a marginal topic. A multivariable
+calculus lesson that needs kinematics should pull in the physics curriculum
+rather than grow a hand-made node. Recorded as an intuition rather than a
+measurement, with revisit triggers, in `curriculum.md`.
 
 ## Still genuinely open
 

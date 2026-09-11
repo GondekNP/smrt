@@ -7,6 +7,13 @@ find it.
 | Template | Written by | Read by |
 |---|---|---|
 | `derive.md` | `derive` | `submit_artifact`, `record_grade` |
+| curriculum topic | `smrt-curriculum seed` | `smrt-curriculum audit`, the `teach` skill |
+
+The curriculum-topic shape lives in `vault_tools/curriculum.py` rather than
+here, because it is emitted by code rather than filled in by hand. Its contract
+is narrower than it looks: seeding writes the canon fields **once** and never
+returns, so `relevance`, `relevance_note`, `first_taught` and `outcomes` are
+yours alone. A canon that has moved is reported by `audit`, not repaired.
 
 ## Why front matter
 

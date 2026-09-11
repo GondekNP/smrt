@@ -23,8 +23,12 @@ control reasons.
 Two separate unknowns, two separate tools:
 
 - **Current level** → `quiz`. A mapping job, not a spot check. Locate the
-  *edge* of understanding along every strand the lesson depends on.
-- **Learning goal** → `ask`. No right answer, so never a quiz.
+  *edge* of understanding along every strand the lesson depends on — and the
+  strands are canonical topics, not invented ones. See `curriculum.md`.
+- **Learning goal** → asked conversationally. No right answer, so never a
+  quiz. (`ask` was specified for this and is not implemented; a tool call
+  cannot ask anyone anything here, and a genuine question in conversation is
+  just talking.)
 
 The edge is only located when **bracketed**: something at that level answered
 right (a floor) *and* something answered wrong (a ceiling). One side alone
@@ -37,10 +41,26 @@ tells you almost nothing.
 
 ### Phase 2 — Plan
 
-Reason out the approach, present it as prose plus a small mermaid DAG —
-unconditional truths at the roots, the goal as the sink. **Stress-test the
-roots**: anything treated as foundational that actually derives from
+**The node set is selected, not invented.** Reason out the approach over the
+canonical topics (`curriculum.md`) and present it as prose plus a small mermaid
+DAG — unconditional truths at the roots, the goal as the sink. **Stress-test
+the roots**: anything treated as foundational that actually derives from
 something simpler should be pushed down.
+
+Edges are yours to infer; the node set is not. A wrong edge shows up as a
+confusing lesson and gets corrected. A missing node shows up as nothing at
+all, which is why coverage is imported rather than generated.
+
+**What gets approved is a diff, not a blank page.** Three things, explicitly:
+
+- which canonical topics are **in scope** for this goal
+- which are **out**, and why — "cover, but reframe for n dimensions" is the
+  common case, not a plain yes or no
+- what you are **adding** beyond the canon, marked `source: agent`
+
+That shape matters. Approving a from-scratch graph means auditing it for
+things that are not there, which nobody can do. Approving a diff means
+omissions are something declined in the open rather than never seen.
 
 Then stop and wait.
 

@@ -106,6 +106,54 @@ superset is legible as a superset. The work is expected to be a subset of the
 canon in places and a superset in others; both are fine, and only the second
 needs marking.
 
+## The mechanism: import once, seed often
+
+Two steps, and separating them is what keeps the layers apart in practice
+rather than only in principle.
+
+**Import — development-time, rare, human-reviewed.** An OCW syllabus becomes a
+TOML file in `curriculum/`. Deliberately **not a scraper**: the valuable part
+is the review, four courses change every few years, and a scraper that silently
+drifts is the exact failure this layer exists to prevent. TOML because
+`tomllib` is stdlib, the repo already speaks it, and it diffs cleanly for
+review.
+
+What the import must record, beyond the topics:
+
+- `url` and `verified` — the citation and the date it was checked
+- `excluded` — **what the import left out and why.** 18.06SC lists three
+  "Exam N Review" sessions; those are assessments, not topics. Dropping them
+  is right and dropping them silently is not, because "what did the import
+  leave out" has to be answerable.
+
+Refs are unit-relative (`U2-02`), not global lecture numbers. The syllabus page
+restarts numbering per unit, so `L1..L35` would be inferred rather than read —
+and inventing identifiers in the canon is precisely the thing being avoided.
+
+**Seed — per vault, mechanical, idempotent.** `smrt-curriculum seed` writes one
+note per canonical topic. It **creates and never modifies**, and that is the
+load-bearing property of the whole module: a topic note holds canon fields and
+judgment fields in the same file, so an updating seeder could overwrite a
+relevance decision. A design built on "nothing is lost quietly" cannot have an
+overwriting seeder underneath it.
+
+So a canon that has moved is a **reported** condition, not a resolved one:
+
+```bash
+smrt -- smrt-curriculum audit
+```
+
+- **holes** — a canonical topic with no note. The condition this layer exists
+  for: a topic nobody can even record a decision about.
+- **orphans** — a note under `curriculum/` that the canon does not list.
+- **unjudged** — `relevance: unset`, counted by verdict.
+
+Filenames are sanitized for the characters Obsidian forbids and iOS sync
+dislikes, and the exact title survives as an `aliases` entry — so
+`[[Solving Ax = 0: Pivot Variables, Special Solutions]]` still resolves to
+`Solving Ax = 0- Pivot Variables, Special Solutions.md`. Two titles that
+sanitize to the same filename are a **load error**, not a silent merge.
+
 ## The course spine
 
 Verified on 2026-09-11 against ocw.mit.edu — **not typed from memory**, which

@@ -9,9 +9,21 @@ at `/vault` read-write; Obsidian reads the same files from outside.
 
 ```
 .claude/skills/  agent skills. teach/ is the one that matters.
-notes/           subject matter. one directory per subject.
+curriculum/      GENERATED. one note per canonical topic, seeded from the
+                 canon in the repo. Your relevance judgments live here.
+notes/           subject matter. one directory per subject. Yours.
 attachments/     images. derive submissions land here.
 logs/            session transcripts written by md_log.
+```
+
+`curriculum/` is generated and `notes/` is authored — the split is deliberate,
+so seeded material never reads as something you wrote. Seeding only ever
+creates; it will not modify a note you have judged, even when the canon moves.
+See `docs/curriculum.md`.
+
+```bash
+smrt -- smrt-curriculum seed     # create missing topic notes
+smrt -- smrt-curriculum audit    # holes, orphans, and what is still unjudged
 ```
 
 **`.claude/skills/` is not a style choice, it is the only path that works.**
