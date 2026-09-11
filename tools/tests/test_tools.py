@@ -134,50 +134,77 @@ class TestAnswerQuiz(Base):
 
         posed = self.pose()
         wrong = answer_quiz(posed.question_id, pick="b",
-                            reason="variance feels right", reason_correct=False)
+                            reason="variance feels right",
+                            reason_verdict="coherent")
         self.assertFalse(wrong.pick_correct)
 
-    def test_the_four_outcomes_match_the_documented_table(self) -> None:
+    def test_the_outcomes_match_the_documented_table(self) -> None:
         cases = {
-            ("a", True): "solid",
-            ("a", False): "lucky_guess",
-            ("b", True): "misconception",
-            ("b", False): "gap",
+            ("a", "sound"): "solid",
+            ("a", "coherent"): "lucky_guess",
+            ("a", "incoherent"): "lucky_guess",
+            ("b", "sound"): "slip",
+            ("b", "coherent"): "misconception",
+            ("b", "incoherent"): "gap",
         }
-        for (pick, reason_ok), expected in cases.items():
+        for (pick, verdict), expected in cases.items():
             posed = self.pose()
             result = answer_quiz(posed.question_id, pick=pick,
-                                 reason="a reason", reason_correct=reason_ok)
+                                 reason="a reason", reason_verdict=verdict)
             self.assertEqual(result.diagnosis, expected,
-                             f"pick={pick} reason_correct={reason_ok}")
+                             f"pick={pick} reason_verdict={verdict}")
             self.assertTrue(result.next_step)
+
+    def test_a_sound_reason_with_a_wrong_pick_is_a_slip_not_a_gap(self) -> None:
+        """The finding from the first live session. The learner described the
+        correct option accurately and then picked a different one; a boolean
+        verdict forced that into "gap", prescribing "back up a level" for a
+        mis-click."""
+        posed = self.pose()
+        result = answer_quiz(
+            posed.question_id, pick="b",
+            reason="it maximizes the likelihood of the data we observed, "
+                   "given a fixed theta",
+            reason_verdict="sound",
+        )
+        self.assertFalse(result.pick_correct)
+        self.assertEqual(result.diagnosis, "slip")
+        self.assertIn("mismatch", result.next_step)
+        self.assertNotIn("back up", result.next_step.lower().replace(
+            "do not back up", ""))
+
+    def test_an_unknown_verdict_is_refused(self) -> None:
+        posed = self.pose()
+        with self.assertRaisesRegex(ToolError, "reason_verdict must be"):
+            answer_quiz(posed.question_id, pick="a", reason="r",
+                        reason_verdict="maybe")
 
     def test_the_explanation_is_released_only_now(self) -> None:
         posed = self.pose()
         result = answer_quiz(posed.question_id, pick="a", reason="r",
-                             reason_correct=True)
+                             reason_verdict="sound")
         self.assertIn("maximizes the normal likelihood", result.explanation)
 
     def test_a_question_cannot_be_answered_twice(self) -> None:
         """Re-answering would let a learner converge by elimination, which
         destroys the signal the question was posed to collect."""
         posed = self.pose()
-        answer_quiz(posed.question_id, pick="b", reason="r", reason_correct=False)
+        answer_quiz(posed.question_id, pick="b", reason="r", reason_verdict="incoherent")
         with self.assertRaisesRegex(ToolError, "already been answered"):
             answer_quiz(posed.question_id, pick="a", reason="r",
-                        reason_correct=True)
+                        reason_verdict="sound")
 
     def test_unknown_question_id_says_what_is_known(self) -> None:
         posed = self.pose()
         with self.assertRaises(ToolError) as caught:
-            answer_quiz("quiz-nope", pick="a", reason="r", reason_correct=True)
+            answer_quiz("quiz-nope", pick="a", reason="r", reason_verdict="sound")
         self.assertIn(posed.question_id, str(caught.exception))
 
     def test_a_pick_outside_the_options_is_refused(self) -> None:
         posed = self.pose()
         with self.assertRaisesRegex(ToolError, "not one of"):
             answer_quiz(posed.question_id, pick="z", reason="r",
-                        reason_correct=True)
+                        reason_verdict="sound")
 
     def test_a_blank_reason_is_refused(self) -> None:
         """A pick without a justification is the plain multiple choice this
@@ -185,7 +212,7 @@ class TestAnswerQuiz(Base):
         posed = self.pose()
         with self.assertRaisesRegex(ToolError, "reason is required"):
             answer_quiz(posed.question_id, pick="a", reason="  ",
-                        reason_correct=True)
+                        reason_verdict="sound")
 
 
 RUBRIC = [

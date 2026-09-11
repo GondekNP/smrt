@@ -175,7 +175,9 @@ class TestRoundTrip(unittest.TestCase):
                 "question_id": posed["question_id"],
                 "pick": "b",
                 "reason": "the median is robust, so it must be the MLE",
-                "reason_correct": True,
+                # Coherent, not sound: a position someone could hold, and
+                # wrong. "sound" here would make it a slip.
+                "reason_verdict": "coherent",
             })
             return posed, payload(answered)
 

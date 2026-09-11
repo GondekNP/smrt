@@ -72,6 +72,7 @@ import re
 import secrets
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Literal
 
 from mcp.server.mcpserver import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
@@ -185,46 +186,73 @@ class QuizPosed:
     warnings: list[str]
 
 
+ReasonVerdict = Literal["sound", "coherent", "incoherent"]
+
+
 @dataclass
 class QuizResult:
     """Pick and reason are graded SEPARATELY. That separation is the point:
     it distinguishes a correct answer from a correct answer held for the
     right reason, which plain multiple choice cannot see at all.
 
-    Four outcomes:
-      right / right      -> solid, advance
-      right / wrong      -> lucky guess. the most valuable signal here.
-      wrong / coherent   -> a specific, nameable misconception
-      wrong / incoherent -> genuine gap, back up a level
+    Five outcomes:
+      right / sound       -> solid, advance
+      right / not sound   -> lucky guess. the most valuable signal here.
+      wrong / sound       -> a slip. the pick and the reasoning disagree.
+      wrong / coherent    -> a specific, nameable misconception
+      wrong / incoherent  -> genuine gap, back up a level
+
+    `slip` was added on 2026-09-11 after the first live session produced it
+    immediately. The learner described the correct option accurately and then
+    picked a different one; under a boolean verdict the agent had to call that
+    reasoning either correct (making it a "misconception") or incorrect
+    (making it a "gap"), and it chose the latter — so the mildest error
+    available collected the harshest prescription, "back up a level". Its own
+    prose said the reasoning was "internally sound" while the grade it
+    submitted said otherwise. The table was missing a cell, not the model.
     """
 
     pick_correct: bool
-    reason_correct: bool
+    reason_verdict: ReasonVerdict
     diagnosis: str
     next_step: str
     explanation: str
 
 
-# The four cells of the table in `docs/teaching-loop.md`, as data rather than
-# as branches, so the diagnosis cannot drift from the documented one.
-_OUTCOMES: dict[tuple[bool, bool], tuple[str, str]] = {
-    (True, True): (
+# The cells of the table in `docs/teaching-loop.md`, as data rather than as
+# branches, so the diagnosis cannot drift from the documented one.
+_LUCKY = (
+    "lucky_guess",
+    "Right for the wrong reasons, and invisible under plain multiple "
+    "choice — this is the most valuable signal available. Probe the same "
+    "idea from another angle before advancing.",
+)
+
+_OUTCOMES: dict[tuple[bool, str], tuple[str, str]] = {
+    (True, "sound"): (
         "solid",
         "Advance.",
     ),
-    (True, False): (
-        "lucky_guess",
-        "Right for the wrong reasons, and invisible under plain multiple "
-        "choice — this is the most valuable signal available. Probe the same "
-        "idea from another angle before advancing.",
+    # A coherent-but-wrong reason that still selected the right option and a
+    # pure guess are both "right for the wrong reasons". Kept as one outcome
+    # because the documented table has one, and the verdict is preserved on
+    # the result if the distinction ever earns its own cell.
+    (True, "coherent"): _LUCKY,
+    (True, "incoherent"): _LUCKY,
+    (False, "sound"): (
+        "slip",
+        "A slip, not a gap: the reasoning was right and the pick was not. "
+        "Show the learner the mismatch between their own words and their "
+        "choice — do not re-teach the concept, and do not back up a level. "
+        "Then move on, or re-ask this one later to confirm.",
     ),
-    (False, True): (
+    (False, "coherent"): (
         "misconception",
         "A specific, nameable misconception rather than an absence. Name it, "
         "then probe its extent — misconceptions generalize, so it is likely "
         "affecting neighbouring nodes too.",
     ),
-    (False, False): (
+    (False, "incoherent"): (
         "gap",
         "A genuine gap, not a misconception. Back up a level rather than "
         "re-explaining this one.",
@@ -345,7 +373,7 @@ def answer_quiz(
     question_id: str,
     pick: str,
     reason: str,
-    reason_correct: bool,
+    reason_verdict: ReasonVerdict,
 ) -> QuizResult:
     """Grade a quiz answer. `pick_correct` is computed here, not accepted.
 
@@ -353,12 +381,23 @@ def answer_quiz(
     chose; `reason` is their one-line justification verbatim, not your summary
     of it.
 
-    `reason_correct` is your judgment, and it is the only part of the grade
-    this tool takes on trust. Read it as **sound**, not as identical to your
-    own explanation: for a wrong pick it means the reasoning was coherent — a
-    position someone could actually hold — rather than noise. That distinction
-    is what separates a misconception from a gap, and they call for opposite
-    responses.
+    `reason_verdict` is your judgment, and it is the only part of the grade
+    this tool takes on trust. Judge the reasoning ON ITS OWN, not by whether
+    it matches the pick — the tool already knows the pick:
+
+      "sound"       the reasoning is correct. Note that this is possible
+                    alongside a WRONG pick, and saying so is the point: it
+                    means the learner understood and mis-selected, which is a
+                    slip and not a gap.
+      "coherent"    wrong, but a position someone could actually hold — a
+                    nameable belief rather than noise.
+      "incoherent"  no usable reasoning: noise, a restatement of the option,
+                    or a guess admitted as one.
+
+    Do not reach for "incoherent" because the reasoning disagrees with the
+    pick. That combination is exactly what "sound" plus a wrong pick encodes,
+    and calling it incoherent prescribes backing up a level for what was a
+    mis-click.
 
     A question can only be answered once. Re-answering would let a learner
     converge on the right box by elimination, which destroys the signal the
@@ -389,12 +428,18 @@ def answer_quiz(
             "to avoid"
         )
 
+    if reason_verdict not in ("sound", "coherent", "incoherent"):
+        raise ToolError(
+            f"reason_verdict must be sound, coherent or incoherent, "
+            f"not {reason_verdict!r}"
+        )
+
     posed.answered = True
     pick_correct = pick == posed.correct_option_id
-    diagnosis, next_step = _OUTCOMES[(pick_correct, reason_correct)]
+    diagnosis, next_step = _OUTCOMES[(pick_correct, reason_verdict)]
     return QuizResult(
         pick_correct=pick_correct,
-        reason_correct=reason_correct,
+        reason_verdict=reason_verdict,
         diagnosis=diagnosis,
         next_step=next_step,
         explanation=posed.explanation,
