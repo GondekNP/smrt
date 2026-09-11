@@ -58,15 +58,27 @@ Not interchangeable. Each buys something specific.
 
 Retained despite the obvious objection to plain MC, because requiring a
 one-line justification alongside the pick recovers what MC was losing.
-**The pick and the reason are graded separately**, giving four outcomes
-instead of two:
+**The pick and the reason are graded separately**, giving five outcomes
+instead of two. The reason is judged **on its own** — `sound`, `coherent` or
+`incoherent` — and never against the pick, because combining the two is the
+tool's job and it already knows the pick:
 
 | Pick | Reason | Diagnosis |
 |---|---|---|
-| right | right | Solid. Advance. |
-| right | wrong | Lucky guess or right-for-wrong-reasons. **The most valuable signal here** — invisible under plain MC. |
-| wrong | coherent | A specific, nameable misconception. Dig into its extent. |
-| wrong | incoherent | Genuine gap, not a misconception. Back up a level. |
+| right | `sound` | Solid. Advance. |
+| right | `coherent` or `incoherent` | Lucky guess or right-for-wrong-reasons. **The most valuable signal here** — invisible under plain MC. |
+| wrong | `sound` | **A slip.** The reasoning was right and the pick was not. Show the mismatch; do not re-teach, and do not back up. |
+| wrong | `coherent` | A specific, nameable misconception. Dig into its extent. |
+| wrong | `incoherent` | Genuine gap, not a misconception. Back up a level. |
+
+**`slip` was added on 2026-09-11, and the first live session produced it
+immediately** — which is the argument for having run one. The learner
+described the correct option accurately and then picked a different one. Under
+a boolean verdict the agent had to call that reasoning either correct, making
+it a "misconception", or incorrect, making it a "gap"; it chose gap, so the
+mildest error available collected the harshest prescription. Its own prose told
+the learner the reasoning was "internally sound" while the grade it submitted
+said the opposite. The table was missing a cell, not the model.
 
 Distractor construction, worth preserving verbatim from the source skill:
 

@@ -52,8 +52,26 @@ into the part that can be computed and the part that needs a model:
 
 | Checked by the tool | Trusted to the agent |
 |---|---|
-| `pick_correct` — a string comparison against the committed key. `answer_quiz` takes no such argument, so it cannot be reported wrongly. | `reason_correct` — was the justification sound. For a wrong pick, read it as *coherent*: a position someone could hold, rather than noise. That distinction separates a misconception from a gap. |
+| `pick_correct` — a string comparison against the committed key. `answer_quiz` takes no such argument, so it cannot be reported wrongly. | `reason_verdict` — `sound`, `coherent` or `incoherent`, judging the reasoning **on its own** rather than against the pick. The tool already knows the pick; combining the two is its job. |
 | That `hit` and `missed` together account for **exactly** the committed rubric — nothing invented, nothing dropped. Without it, an agent looking at a weak answer could grade against a rubric it had quietly softened, and the published hash would still match. | Which rubric items the prose actually hit. |
+
+### Five outcomes, not four
+
+The verdict is three-valued because a boolean could not express the first thing
+the first live session produced. The learner described the correct option
+accurately and then picked a different one — a **slip**. With a boolean the
+agent had to call that reasoning either correct, making it a "misconception",
+or incorrect, making it a "gap"; it chose gap, so the mildest error available
+collected the harshest prescription, *back up a level*. Its own prose said the
+reasoning was "internally sound" while the grade it submitted said otherwise.
+
+| Pick | Reason | Outcome |
+|---|---|---|
+| right | `sound` | solid — advance |
+| right | `coherent` / `incoherent` | lucky guess — right for the wrong reasons |
+| wrong | `sound` | **slip** — show the mismatch, do not re-teach |
+| wrong | `coherent` | misconception — name it, probe its extent |
+| wrong | `incoherent` | gap — back up a level |
 
 Two smaller ones: a question cannot be answered twice (re-answering lets a
 learner converge by elimination, destroying the signal), and the posing call's

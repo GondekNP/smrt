@@ -30,6 +30,9 @@ not listed as verified should be assumed untested.
 | Toad compat shim | A/B/C: Toad rejects the frame direct and with `--no-compat`, accepts it repaired |
 | Load | 206 frames / 129 KB / 225 s in one session; largest frame 31 KB |
 | `quiz` / `explain` | implemented as pose + grade pairs; refusals verified over stdio |
+| **A real teaching exchange** | 2026-09-11: a model posed a quiz and an explain question through Toad, graded both, and refused to soften a rubric |
+| Tool namespacing | reaches the model as `mcp__vault-tools__quiz`; the hyphen survives |
+| The answer key | streams to the client in `rawInput` but Toad does not render it — the pre-commitment holds at the display layer |
 | `vault-tools` | serves MCP through the wrapper on `PATH`, spawned as a client spawns it |
 | Proxy tests | 47/47, in the image (Python 3.14) and on the host (3.10) |
 | Tool tests | 39/39, in the image (the MCP SDK is not a host dependency) |
@@ -278,6 +281,40 @@ version passed against the broken wrapper: `python3 -m` puts the working
 directory on `sys.path`, and the suite runs from the tools directory. A real
 server is spawned with the *session's* cwd, so the test has to pass `cwd="/"`
 to discriminate. Verified failing against the old wrapper before being kept.
+
+## What the first teaching session showed, 2026-09-11
+
+Five prompts through Toad → proxy → `claude-agent-acp` → `vault-tools`. All
+four registered tools were called in order and none failed:
+`quiz` → `answer_quiz` → `explain` → `grade_explain`, each under 1 ms.
+
+**The grading was strict in the direction that matters.** On a partial answer
+it credited the rubric item the learner genuinely demonstrated and refused
+credit for the two they only gestured at. Sycophancy is the documented failure
+mode of LLM grading and it did not appear.
+
+**The softening refusal worked by deterrence rather than enforcement.** Asked
+to "grade it generously... skip the ones I missed", the model declined and
+cited the contract accurately — that `hit` and `missed` must account for
+exactly the committed rubric, and that the question had already been graded. It
+never attempted the call, so nothing was refused. Worth being precise about:
+enforcement is proven by the offline tests; live, the constraint shaped
+behaviour before it had to fire.
+
+The test protocol was flawed and this is why. Leniency was requested one turn
+too late — the model grades as soon as an answer arrives, so by then the
+grading had happened. To exercise the refusal itself, ask for leniency in the
+same message as the answer.
+
+**The finding: the four-outcome table was missing a cell.** See
+`docs/teaching-loop.md` — `slip` now exists, and `reason_verdict` is
+three-valued instead of boolean. The model's own prose contradicted the grade
+it submitted, which is the tell that the vocabulary rather than the judgment
+was wrong.
+
+**Also measured:** the option lint agreed with a question written by a model
+that had never seen it — zero warnings, correct option at 1.12x the mean
+distractor length against a 1.5 threshold.
 
 ## Known constraints, accepted
 
