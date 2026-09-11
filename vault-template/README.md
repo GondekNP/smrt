@@ -12,7 +12,8 @@ at `/vault` read-write; Obsidian reads the same files from outside.
 concepts/        the vocabulary ledger. one note per concept, counters
                  written by the tools. `gate: off` is yours.
 curriculum/      GENERATED. one note per canonical topic, seeded from the
-                 canon in the repo. Your relevance judgments live here.
+                 canon in the repo — a course syllabus, a textbook, or a
+                 paper. Your relevance judgments live here.
 notes/           subject matter. one directory per subject. Yours.
 attachments/     images. derive submissions land here.
 logs/            session transcripts written by md_log.
@@ -57,3 +58,15 @@ Sessions may be launched with a read-only subject directory mounted. The
 teach skill assumes nothing about it beyond "files exist there." If you find
 yourself wanting the skill to know it's a Python repo, that's a smell — see
 `docs/environment.md`.
+
+**Taking a class?** Mount its material as the subject and import the text as a
+canon:
+
+```bash
+smrt ~/class/bayes-hierarchical     # the book, lecture notes, problem sets
+```
+
+The text then sets the notation, the naming and the scope — the things you are
+actually graded on — while the explanation stays free to be better than the
+book's. `pdftotext -f 108 -l 113 book.pdf -` is how a lesson reads six pages
+instead of seven hundred, and a `locator` in the canon is what says which six.

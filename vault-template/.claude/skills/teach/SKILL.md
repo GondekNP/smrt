@@ -114,11 +114,24 @@ confusing lesson and gets corrected; a missing node never shows up at all,
 because nothing points at it. Inferring edges within a subject is your job.
 Deciding what exists to be learned is not.
 
+A canon is not always a course. `canon_kind` says whether a topic came from a
+`course` syllabus, a `text`, or a `paper` — all three are node sets somebody
+else authored and someone verified, which is the only property that matters
+here.
+
 When a lesson leans on something outside the current curriculum, **prefer
 importing the relevant standard over inventing a node for it.** A multivariable
 calculus lesson that needs kinematics should pull in the physics curriculum,
 not grow a hand-made `kinematics` node. Invented marginal topics accumulate as
-plausible, unreviewed, permanent cruft.
+plausible, unreviewed, permanent cruft. If the learner's own course text covers
+it, that text is the standard to import.
+
+Two canons often cover the same topic — a course and its textbook, say. That
+overlap is real rather than a mistake, and the notes are filename-scoped
+(`Bayes' Theorem (18.05)` and `Bayes' Theorem (BDA3)`) so links stay
+unambiguous. It is also where the most useful judgment lives: one thing to
+learn, two accounts of it, and the question is which account this learner
+needs.
 
 Anything you do add outside the canon carries `source: agent`, so a superset
 stays legible as a superset.
@@ -132,6 +145,58 @@ Treat it as a visible hole, not as out of scope.
 there."** Read what's present. Never branch on project type — this skill must
 work equally for a Python repo, a KiCad project, a folder of PDFs, or nothing
 at all.
+
+It is mounted **read-only**. Everything you write goes in the vault.
+
+## Grounding in a source text
+
+When `/subject` holds the text for a course the learner is actually taking — a
+textbook, a lecturer's notes, a paper they have to present — that text
+**outranks your own account on three things**:
+
+- **Notation.** Which symbol means what, and which convention this field uses.
+- **Naming.** What the term is called here, when several names exist.
+- **Scope.** What counts as in or out, and therefore what gets examined.
+
+It does **not** automatically outrank you on the explanation itself. A text can
+be terse, idiosyncratic, or wrong, and the goal is understanding rather than
+fidelity to one author.
+
+**When the text and the better account diverge, say so — once, briefly — and
+then teach the text's version.** That is what the learner will be marked on.
+Silently substituting a clearer treatment leaves them fluent in a notation
+nobody around them uses, and they find out during an exam.
+
+### Read by locator, not by search
+
+A canonical topic imported from a text carries a `locator` in its front
+matter — `pp. 108-113`, `§5.4`. **Read those pages and stop.** The whole point
+of importing the table of contents is that grounding one node costs a section
+rather than a book.
+
+```bash
+pdftotext -f 108 -l 113 /subject/book.pdf -     # a page range, to stdout
+pdftotext /subject/book.pdf - | rg -n 'shrinkage'   # only when nothing points
+```
+
+Reading widely to be thorough is the failure mode here, not the safe choice: it
+spends the context the lesson itself needs, and a lesson that runs out of room
+is worse than one grounded in five pages. If no locator points at the topic,
+search for it, read the narrowest thing that answers the question, and consider
+recording what you found as a locator suggestion for a human to check.
+
+**Cite, don't reproduce.** Quote a definition or a line of notation where the
+exact wording matters. The vault is a record of the learner's understanding,
+not a copy of somebody's book.
+
+### A text is not automatically a curriculum
+
+A textbook is ordered for teaching, so its chapter order is a reasonable
+starting point for a DAG. **A paper is not.** Its section order is rhetorical
+and it assumes a reader who already knows the field, so using it as a lesson
+sequence produces a plan shaped like an argument instead of like a dependency
+graph. For a paper, treat the sections as things to be quizzed on, and ask what
+background it silently assumes — that is where the actual teaching is.
 
 ## Rendering
 
