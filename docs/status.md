@@ -316,6 +316,25 @@ was wrong.
 that had never seen it — zero warnings, correct option at 1.12x the mean
 distractor length against a 1.5 threshold.
 
+## The curriculum layer, decided 2026-09-11
+
+`docs/curriculum.md`. The lesson DAG's **node set** is imported from MIT OCW
+and checked into this repo rather than generated, because an omission is
+invisible: a wrong edge shows up as a confusing lesson, a missing node shows up
+as nothing at all. Three layers — the canon (checked in, cited, never edited by
+the agent), relevance (per vault, jointly authored, enum plus prose), and
+evidence (existing `derive` wikilinks pointing at curriculum topics).
+
+The course spine was verified against ocw.mit.edu rather than recalled, and
+that was not ceremony: recall put measure-theoretic probability at 18.675 and
+the published course is 18.175. A hallucinated course number would have
+poisoned the canon at its root.
+
+Also recorded there, as a rule and deliberately not enforced in code: prefer
+importing another standard over generating a marginal topic. Flagged as an
+intuition rather than a measurement, with the symptoms that should trigger a
+revisit.
+
 ## Known constraints, accepted
 
 - **Docker Desktop does not work**, and SMRT refuses to start on it rather than
