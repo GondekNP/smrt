@@ -8,11 +8,26 @@ at `/vault` read-write; Obsidian reads the same files from outside.
 ## Layout
 
 ```
-skills/        agent skills. teach/ is the one that matters.
-notes/         subject matter. one directory per subject.
-attachments/   images. derive submissions land here.
-logs/          session transcripts written by md_log.
+.claude/skills/  agent skills. teach/ is the one that matters.
+notes/           subject matter. one directory per subject.
+attachments/     images. derive submissions land here.
+logs/            session transcripts written by md_log.
 ```
+
+**`.claude/skills/` is not a style choice, it is the only path that works.**
+Skills were at `skills/` until 2026-09-11, where the agent never found them --
+so `teach` had never once been loaded. Measured rather than reasoned: the agent
+advertises its commands during session setup, and a probe skill placed at each
+location showed up from `.claude/skills/` and not from `skills/`. The dot
+folder is also invisible to Obsidian, which is a small bonus.
+
+Verify it after any change, for free -- no prompt, no model call:
+
+```bash
+smrt -- python3 /workspace/proxy/tests/spawn_session.py vault-tools=vault-tools
+```
+
+`teach` should appear in the advertised command list.
 
 ## Conventions
 

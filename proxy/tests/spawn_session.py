@@ -57,6 +57,7 @@ def main() -> int:
     delay = float(os.environ.get("SPAWN_WAIT", "20"))
     print(f"waiting {delay:.0f}s for MCP servers to be spawned...\n")
     deadline = time.monotonic() + delay
+    commands: list[dict] = []
     while time.monotonic() < deadline:
         try:
             message = client.inbox.get(timeout=max(0.1, deadline - time.monotonic()))
@@ -64,6 +65,19 @@ def main() -> int:
             continue
         if message is None:
             break
+        update = ((message.get("params") or {}).get("update") or {})
+        if update.get("sessionUpdate") == "available_commands_update":
+            commands = update.get("availableCommands") or []
+
+    # Advertised commands arrive as a notification during session setup, so
+    # "is my skill discoverable?" is answerable here too, for free.
+    print("--- commands the agent advertises ---")
+    if commands:
+        names = sorted(c.get("name", "?") for c in commands)
+        print(f"  {len(names)}: {', '.join(names)}")
+    else:
+        print("  none seen")
+    print()
 
     print("--- Claude Code's own MCP logs (the authoritative reason) ---")
     cache = Path(os.path.expanduser("~/.cache/claude-cli-nodejs"))
