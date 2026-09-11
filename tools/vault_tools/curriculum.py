@@ -53,6 +53,10 @@ from pathlib import Path
 # Ax = 0: Pivot Variables, Special Solutions]]` still resolves.
 _UNSAFE = re.compile(r'[:/\\|#^\[\]?*"<>]')
 
+# A printed page or a printed page range. Deliberately narrow: "chapter 5"
+# and "around p. 100" belong in `locator`, which is free text.
+_PAGES = re.compile(r"\d{1,5}(?:-\d{1,5})?")
+
 # Every kind needs an identity and a date someone checked it. What counts as
 # a citation differs by kind, so the rest is per-kind: a course lives at a URL,
 # a book is identified by author and edition, a paper by author and a link.
@@ -74,6 +78,27 @@ class CanonError(Exception):
 
 
 @dataclass(frozen=True)
+class SourceFile:
+    """One file of a source, and how its page numbers relate to the book's.
+
+    `page_offset` exists because a PDF's page 1 is almost never the book's
+    page 1, and a book split into per-chapter PDFs has a *different* offset
+    per file. Getting this wrong extracts the wrong pages and says nothing,
+    which is the worst way for grounding to fail -- so the arithmetic is done
+    here rather than by a model doing sums in its head.
+
+        pdf_page = printed_page + page_offset
+    """
+
+    id: str
+    path: str
+    page_offset: int = 0
+
+    def pdf_page(self, printed: int) -> int:
+        return printed + self.page_offset
+
+
+@dataclass(frozen=True)
 class Topic:
     ref: str
     unit: str
@@ -81,15 +106,31 @@ class Topic:
     #: Where in the source this lives: "pp. 108-113", "§5.4", "Lecture 12".
     #: Optional, because a syllabus that does not say must not be made to.
     locator: str = ""
-    #: Set by `load_all` when two canons share a topic title. See
-    #: `_disambiguate`; a bare suffix here keeps `filename` a pure function.
-    suffix: str = ""
+    #: Which `[[file]]` id holds it. Defaults to the only one, if there is one.
+    file: str = ""
+    #: Printed page range, "31" or "31-45". Structured so it can be resolved
+    #: to a pdftotext invocation; `locator` stays free text for citation.
+    pages: str = ""
+    #: What distinguishes this note's filename from another topic with the
+    #: same title. `load` adds the ref when a title repeats inside one canon;
+    #: `load_all` adds the canon's tag when two canons share a title. Held as
+    #: data rather than baked into the name so `filename` stays a pure
+    #: function and the two cases compose.
+    qualifiers: tuple[str, ...] = ()
+
+    @property
+    def page_range(self) -> tuple[int, int] | None:
+        if not self.pages:
+            return None
+        first, _, last = self.pages.partition("-")
+        return (int(first), int(last or first))
 
     @property
     def filename(self) -> str:
         stem = _safe_name(self.name)
-        if self.suffix:
-            stem = f"{stem} ({_safe_name(self.suffix)})"
+        if self.qualifiers:
+            inner = " · ".join(_safe_name(q) for q in self.qualifiers)
+            stem = f"{stem} ({inner})"
         return stem + ".md"
 
 
@@ -108,6 +149,27 @@ class Canon:
     prerequisites: str = ""
     textbook: str = ""
     excluded: str = ""
+    #: Directory holding this source's files, relative to the subject mount.
+    root: str = ""
+    files: tuple[SourceFile, ...] = ()
+
+    def file_for(self, topic: Topic) -> SourceFile | None:
+        if topic.file:
+            return next((f for f in self.files if f.id == topic.file), None)
+        return self.files[0] if len(self.files) == 1 else None
+
+    def locate(self, topic: Topic) -> tuple[str, int, int] | None:
+        """(path under the subject mount, first pdf page, last pdf page).
+
+        None when the canon does not say where the topic is -- which is a
+        legitimate answer and must not be guessed at.
+        """
+        handle = self.file_for(topic)
+        printed = topic.page_range
+        if handle is None or printed is None:
+            return None
+        path = f"{self.root}/{handle.path}" if self.root else handle.path
+        return (path, handle.pdf_page(printed[0]), handle.pdf_page(printed[1]))
 
     @property
     def units(self) -> tuple[str, ...]:
@@ -173,6 +235,22 @@ def load(path: str | Path) -> Canon:
     if missing:
         raise CanonError(f"{path.name}: [{kind}] is missing {missing}")
 
+    files: list[SourceFile] = []
+    for index, entry in enumerate(raw.get("file") or [], 1):
+        absent = [f for f in ("id", "path") if not entry.get(f)]
+        if absent:
+            raise CanonError(f"{path.name}: file {index} is missing {absent}")
+        offset = entry.get("page_offset", 0)
+        if not isinstance(offset, int):
+            raise CanonError(f"{path.name}: file {entry['id']} has a "
+                             f"non-integer page_offset {offset!r}")
+        files.append(SourceFile(id=str(entry["id"]), path=str(entry["path"]),
+                                page_offset=offset))
+    ids = [f.id for f in files]
+    repeated = sorted({i for i in ids if ids.count(i) > 1})
+    if repeated:
+        raise CanonError(f"{path.name}: duplicate file ids {repeated}")
+
     entries = raw.get("topic") or []
     if not entries:
         raise CanonError(f"{path.name}: no [[topic]] entries")
@@ -182,24 +260,60 @@ def load(path: str | Path) -> Canon:
         absent = [f for f in REQUIRED_TOPIC_FIELDS if not entry.get(f)]
         if absent:
             raise CanonError(f"{path.name}: topic {index} is missing {absent}")
-        topics.append(Topic(ref=entry["ref"], unit=entry["unit"],
-                            name=entry["name"],
-                            locator=str(entry.get("locator", ""))))
+        handle = str(entry.get("file", ""))
+        if handle and handle not in ids:
+            # A dangling reference resolves to "no locator", and a locator
+            # that silently stops working is worse than one that never was.
+            raise CanonError(f"{path.name}: topic {entry['ref']} points at "
+                             f"file {handle!r}, which is not declared")
+        pages = str(entry.get("pages", ""))
+        if pages and not _PAGES.fullmatch(pages):
+            raise CanonError(f"{path.name}: topic {entry['ref']} has pages "
+                             f"{pages!r}; expected \"31\" or \"31-45\"")
+        if pages and not handle and len(files) != 1:
+            raise CanonError(
+                f"{path.name}: topic {entry['ref']} gives pages but no file, "
+                f"and there are {len(files)} to choose from"
+            )
+        topic = Topic(ref=entry["ref"], unit=entry["unit"], name=entry["name"],
+                      locator=str(entry.get("locator", "")),
+                      file=handle, pages=pages)
+        span = topic.page_range
+        if span and span[0] > span[1]:
+            raise CanonError(f"{path.name}: topic {entry['ref']} has pages "
+                             f"{pages!r} running backwards")
+        topics.append(topic)
 
     refs = [t.ref for t in topics]
     duplicates = sorted({r for r in refs if refs.count(r) > 1})
     if duplicates:
         raise CanonError(f"{path.name}: duplicate topic refs {duplicates}")
 
-    files = [t.filename for t in topics]
-    collisions = sorted({f for f in files if files.count(f) > 1})
-    if collisions:
-        # Two topics whose titles differ only in punctuation would seed into
-        # one note and silently lose one of them.
-        raise CanonError(
-            f"{path.name}: topics collide on filename {collisions} — "
-            "distinguish the titles"
-        )
+    # A book reuses section titles: ASM has "Introduction", "Data generation"
+    # and "Summary and outlook" in most of its 21 chapters. That is how books
+    # are written, not a defect in the import, so repeated titles are
+    # qualified by ref rather than refused. Refs are unique (checked above),
+    # so this always resolves.
+    #
+    # It also covers the case this check originally existed for -- two titles
+    # differing only in punctuation, "A/B" and "A-B", which sanitize alike.
+    # Those are still suspicious, but the harm was a silent merge and
+    # qualifying prevents it either way.
+    counts = Counter(t.filename for t in topics)
+    repeated = {name for name, seen in counts.items() if seen > 1}
+    if repeated:
+        topics = [
+            replace(t, qualifiers=t.qualifiers + (t.ref,))
+            if t.filename in repeated else t
+            for t in topics
+        ]
+        left = sorted(name for name, seen
+                      in Counter(t.filename for t in topics).items() if seen > 1)
+        if left:
+            raise CanonError(
+                f"{path.name}: topics still collide on filename {left} after "
+                "qualifying by ref — distinguish the titles"
+            )
 
     return Canon(
         course_id=course["id"],
@@ -215,6 +329,8 @@ def load(path: str | Path) -> Canon:
         prerequisites=course.get("prerequisites", ""),
         textbook=course.get("textbook", ""),
         excluded=course.get("excluded", ""),
+        root=course.get("root", ""),
+        files=tuple(files),
     )
 
 
@@ -236,8 +352,25 @@ def overlaps(canons: Sequence[Canon]) -> dict[str, list[str]]:
     where: dict[str, list[str]] = {}
     for canon in canons:
         for topic in canon.topics:
-            where.setdefault(topic.name, []).append(canon.tag)
+            tags = where.setdefault(topic.name, [])
+            # Distinct canons, not occurrences. A book reusing "Introduction"
+            # in sixteen chapters is not sixteen sources covering it, and
+            # reporting it as "ASM, ASM, ASM, ..." was worse than useless.
+            if canon.tag not in tags:
+                tags.append(canon.tag)
     return {name: tags for name, tags in sorted(where.items()) if len(tags) > 1}
+
+
+def repeats(canon: Canon) -> dict[str, list[str]]:
+    """Titles this canon uses more than once, mapped to the refs using them.
+
+    Normal in a book and worth surfacing anyway: it is why those notes have
+    qualified filenames instead of plain ones.
+    """
+    where: dict[str, list[str]] = {}
+    for topic in canon.topics:
+        where.setdefault(topic.name, []).append(topic.ref)
+    return {name: refs for name, refs in sorted(where.items()) if len(refs) > 1}
 
 
 def _disambiguate(canons: list[Canon]) -> list[Canon]:
@@ -280,8 +413,8 @@ def _disambiguate(canons: list[Canon]) -> list[Canon]:
 
     resolved = [
         replace(canon, topics=tuple(
-            replace(topic, suffix=canon.tag) if topic.filename in shared
-            else topic
+            replace(topic, qualifiers=topic.qualifiers + (canon.tag,))
+            if topic.filename in shared else topic
             for topic in canon.topics
         ))
         for canon in canons
@@ -310,22 +443,30 @@ def note_body(canon: Canon, topic: Topic) -> str:
     Two different questions that look like one.
     """
     alias = ""
-    if topic.suffix:
-        # No alias at all. The bare title is shared with another canon, and an
-        # alias restoring it would re-create through aliases exactly the
-        # ambiguity the filename suffix removed.
+    if topic.qualifiers:
+        # No alias at all. The bare title is shared -- with another section of
+        # this same source, or with another canon -- and an alias restoring it
+        # would re-create through aliases exactly the ambiguity the qualified
+        # filename removes.
         pass
     elif _safe_name(topic.name) != topic.name:
         alias = f'aliases: ["{topic.name}"]\n'
 
     locator = f'locator: "{topic.locator}"\n' if topic.locator else ""
-    where = " — ".join(x for x in (canon.tag, topic.unit, topic.locator) if x)
+    if topic.file:
+        locator += f'file: "{topic.file}"\n'
+    if topic.pages:
+        locator += f'pages: "{topic.pages}"\n'
+    printed = f"pp. {topic.pages}" if topic.pages else ""
+    where = " — ".join(x for x in (canon.tag, topic.unit,
+                                   topic.locator or printed) if x)
     shared = ""
-    if topic.suffix:
+    if topic.qualifiers:
+        inner = " · ".join(topic.qualifiers)
         shared = (
-            "\nAnother canon covers a topic under this same title, so this "
-            f"note is filename-scoped to {canon.tag} and carries no alias. "
-            "Link it explicitly.\n"
+            f"\nThis title is not unique, so the note is qualified ({inner}) "
+            "and carries no alias — a bare link would be ambiguous. Link it "
+            "explicitly.\n"
         )
     return f"""---
 type: curriculum-topic
@@ -398,7 +539,9 @@ def seed(canon: Canon, vault_root: str | Path) -> SeedReport:
         # answer "one topic has no note" with "one topic has two notes" --
         # leaving the judgment in whichever one the canon stopped naming.
         # `audit` reports the move; seeding declines to make it worse.
-        if topic.suffix and (target / replace(topic, suffix="").filename).exists():
+        scoped = canon.tag in topic.qualifiers
+        without = tuple(q for q in topic.qualifiers if q != canon.tag)
+        if scoped and (target / replace(topic, qualifiers=without).filename).exists():
             report.awaiting_rename.append(topic.ref)
             continue
         path.write_text(note_body(canon, topic), encoding="utf-8")
@@ -466,9 +609,12 @@ def audit(canon: Canon, vault_root: str | Path) -> AuditReport:
     # orphan, which is the same information arranged to be confusing.
     stray = present - set(expected)
     for topic in canon.topics:
-        if not topic.suffix:
+        if canon.tag not in topic.qualifiers:
             continue
-        bare = replace(topic, suffix="").filename
+        # Only the canon tag can have been added after this note was seeded;
+        # ref qualifiers are decided by the canon alone and never move.
+        without = tuple(q for q in topic.qualifiers if q != canon.tag)
+        bare = replace(topic, qualifiers=without).filename
         if bare in stray:
             report.renamed.append((bare, topic.filename))
             stray.discard(bare)
@@ -488,6 +634,7 @@ def main(argv: list[str] | None = None) -> int:
 
     args = list(sys.argv[1:] if argv is None else argv)
     action = args.pop(0) if args else "list"
+    spec = args.pop(0) if action == "locate" and args else ""
     canon_dir = args.pop(0) if args else "/workspace/curriculum"
     vault = args.pop(0) if args else "/vault"
 
@@ -507,14 +654,54 @@ def main(argv: list[str] | None = None) -> int:
                   f"verified {canon.verified}")
             if located:
                 print(f"  {located}/{len(canon.topics)} topics carry a locator")
+            if canon.files:
+                print(f"  {len(canon.files)} source "
+                      f"{'file' if len(canon.files) == 1 else 'files'}"
+                      + (f" under {canon.root}/" if canon.root else ""))
+            again = repeats(canon)
+            if again:
+                print(f"  {len(again)} titles repeat inside this canon "
+                      "(normal in a book); those notes are qualified by ref")
             if canon.excluded:
                 print(f"  excluded: {canon.excluded}")
         shared = overlaps(canons)
         if shared:
             print(f"\n{len(shared)} topic titles appear in more than one canon; "
-                  "their notes are filename-scoped:")
+                  "their notes are qualified by canon:")
             for name, tags in shared.items():
                 print(f"  {name} — {', '.join(tags)}")
+        return 0
+
+    if action == "locate":
+        # `smrt-curriculum locate ASM/2.5` -> the exact command to run.
+        # The point of this existing at all is that nothing else has to do the
+        # printed-page-to-pdf-page arithmetic. A model doing that sum in its
+        # head and being quietly wrong extracts the wrong pages and reports
+        # nothing, which is the worst available failure.
+        tag, _, ref = spec.rpartition("/")
+        if not tag or not ref:
+            print("usage: locate <canon>/<ref>    e.g. locate ASM/2.5",
+                  file=sys.stderr)
+            return 2
+        matches = [c for c in canons
+                   if tag in (c.tag, c.course_id, c.number)]
+        if not matches:
+            print(f"no canon matching {tag!r}; try `list`", file=sys.stderr)
+            return 1
+        canon = matches[0]
+        topic = next((t for t in canon.topics if t.ref == ref), None)
+        if topic is None:
+            print(f"{canon.tag} has no topic {ref!r}", file=sys.stderr)
+            return 1
+        print(f"{canon.tag} {topic.ref}  {topic.name}")
+        placed = canon.locate(topic)
+        if placed is None:
+            print("  no locator recorded — the canon does not say where this "
+                  "is, and it must not be guessed")
+            return 1
+        path, first, last = placed
+        print(f"  printed pp. {topic.pages}  ->  pdf pp. {first}-{last}")
+        print(f'  pdftotext -f {first} -l {last} "$SUBJECT_ROOT/{path}" -')
         return 0
 
     if action == "seed":

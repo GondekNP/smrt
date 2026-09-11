@@ -68,16 +68,19 @@ class TestLoad(unittest.TestCase):
         with self.assertRaisesRegex(CanonError, "duplicate topic refs"):
             load(write(MINIMAL.replace('ref = "U1-02"', 'ref = "U1-01"')))
 
-    def test_titles_that_collide_after_sanitizing_are_refused(self) -> None:
+    def test_titles_that_collide_after_sanitizing_do_not_merge(self) -> None:
         """Two titles differing only in forbidden punctuation would seed into
-        one note and silently lose one of them."""
+        one note and silently lose one of them. They are now qualified by ref
+        instead of refused -- the harm was the merge, and a book legitimately
+        reuses section titles, so refusing would have blocked real imports."""
         # "A/B" and "A-B" both sanitize to "A-B" -- a slash against a hyphen
         # is exactly the pair that collides, which is why the first version of
         # this test ("First Thing" vs "First/Thing") did not.
         clash = MINIMAL.replace('name = "First Thing"', 'name = "A/B"')
         clash = clash.replace('name = "Second: Thing"', 'name = "A-B"')
-        with self.assertRaisesRegex(CanonError, "collide on filename"):
-            load(write(clash))
+        canon = load(write(clash))
+        self.assertEqual([t.filename for t in canon.topics],
+                         ["A-B (U1-01).md", "A-B (U1-02).md"])
 
     def test_malformed_toml_names_the_file(self) -> None:
         path = write("[course\nid = 1")
@@ -235,7 +238,7 @@ class TestLoadAll(unittest.TestCase):
             (Path(directory) / "b.toml").write_text(self._two(MINIMAL))
             canon = load_all(directory)[0]
             scoped = canon.topics[1]          # "Second: Thing", sanitized too
-            self.assertTrue(scoped.suffix)
+            self.assertTrue(scoped.qualifiers)
             self.assertNotIn("aliases:", curriculum.note_body(canon, scoped))
 
     def test_overlaps_are_reported_not_just_handled(self) -> None:
@@ -265,7 +268,7 @@ class TestLoadAll(unittest.TestCase):
                 .replace('name = "Second: Thing"', 'name = "Another Thing"'))
             for canon in load_all(directory):
                 for topic in canon.topics:
-                    self.assertEqual(topic.suffix, "")
+                    self.assertEqual(topic.qualifiers, ())
 
     def test_distinct_courses_load_together(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -436,7 +439,7 @@ class TestRenameReporting(unittest.TestCase):
     def test_a_scoped_note_says_why_it_is_scoped(self) -> None:
         canon = self._scoped()
         body = curriculum.note_body(canon, canon.topics[0])
-        self.assertIn("filename-scoped to TEST.101", body)
+        self.assertIn("qualified (TEST.101)", body)
 
 
 class TestTheRealCanon(unittest.TestCase):
@@ -516,3 +519,192 @@ class TestTheCLILabelsEveryKind(unittest.TestCase):
                         curriculum.main([action, directory, vault])
                     self.assertIn("BOOK", out.getvalue(), action)
                     self.assertNotRegex(out.getvalue(), r"(?m)^: ", action)
+
+
+BOOK = """
+[source]
+kind = "text"
+id = "split-book"
+short = "SPLIT"
+title = "A Book In Pieces"
+author = "Someone"
+edition = "1st ed."
+verified = "2026-09-11"
+root = "Shelf/Chapters"
+
+[[file]]
+id = "ch1"
+path = "one.pdf"
+page_offset = 0
+
+[[file]]
+id = "ch2"
+path = "two.pdf"
+page_offset = -14
+
+[[topic]]
+ref = "1.1"
+unit = "Chapter 1"
+name = "Introduction"
+file = "ch1"
+pages = "2-6"
+
+[[topic]]
+ref = "2.1"
+unit = "Chapter 2"
+name = "Introduction"
+file = "ch2"
+pages = "31-44"
+"""
+
+
+class TestSourceFiles(unittest.TestCase):
+    """A book split into per-chapter PDFs has a different page offset per
+    file, and getting one wrong extracts the wrong pages while reporting
+    nothing. So the arithmetic lives in code, and the canon is what gets
+    checked."""
+
+    def setUp(self) -> None:
+        self.canon = load(write(BOOK))
+
+    def test_printed_pages_resolve_to_pdf_pages(self) -> None:
+        second = self.canon.topics[1]
+        self.assertEqual(second.page_range, (31, 44))
+        self.assertEqual(
+            self.canon.locate(second),
+            ("Shelf/Chapters/two.pdf", 17, 30),
+        )
+
+    def test_a_zero_offset_file_resolves_unchanged(self) -> None:
+        self.assertEqual(self.canon.locate(self.canon.topics[0]),
+                         ("Shelf/Chapters/one.pdf", 2, 6))
+
+    def test_a_single_page_is_a_range_of_one(self) -> None:
+        one = load(write(BOOK.replace('pages = "2-6"', 'pages = "2"')))
+        self.assertEqual(one.locate(one.topics[0])[1:], (2, 2))
+
+    def test_a_topic_with_no_pages_does_not_resolve(self) -> None:
+        """None is a legitimate answer. The alternative is guessing."""
+        bare = load(write(BOOK.replace('pages = "2-6"', "")))
+        self.assertIsNone(bare.locate(bare.topics[0]))
+
+    def test_a_dangling_file_reference_is_refused(self) -> None:
+        """It would resolve to "no locator" -- a locator that silently stops
+        working is worse than one that never existed."""
+        with self.assertRaisesRegex(CanonError, "not declared"):
+            load(write(BOOK.replace('file = "ch2"', 'file = "ch9"')))
+
+    def test_duplicate_file_ids_are_refused(self) -> None:
+        with self.assertRaisesRegex(CanonError, "duplicate file ids"):
+            load(write(BOOK.replace('id = "ch2"', 'id = "ch1"')))
+
+    def test_a_non_integer_offset_is_refused(self) -> None:
+        with self.assertRaisesRegex(CanonError, "page_offset"):
+            load(write(BOOK.replace("page_offset = -14", 'page_offset = "-14"')))
+
+    def test_malformed_pages_are_refused(self) -> None:
+        for bad in ('"chapter 5"', '"31--44"', '"around 31"'):
+            with self.subTest(bad=bad):
+                with self.assertRaisesRegex(CanonError, "expected"):
+                    load(write(BOOK.replace('pages = "31-44"', f"pages = {bad}")))
+
+    def test_backwards_pages_are_refused(self) -> None:
+        with self.assertRaisesRegex(CanonError, "backwards"):
+            load(write(BOOK.replace('pages = "31-44"', 'pages = "44-31"')))
+
+    def test_pages_without_a_file_are_refused_when_ambiguous(self) -> None:
+        with self.assertRaisesRegex(CanonError, "no file"):
+            load(write(BOOK.replace('file = "ch2"\n', "")))
+
+    def test_one_file_needs_no_reference(self) -> None:
+        """The single-PDF book case: naming the file every time is noise."""
+        single = BOOK.split("[[file]]\nid = \"ch2\"")[0] + '''
+[[topic]]
+ref = "1.1"
+unit = "Chapter 1"
+name = "Introduction"
+pages = "2-6"
+'''
+        canon = load(write(single))
+        self.assertEqual(canon.locate(canon.topics[0]),
+                         ("Shelf/Chapters/one.pdf", 2, 6))
+
+    def test_a_repeated_title_is_qualified_by_ref(self) -> None:
+        """ASM has "Introduction" in sixteen chapters. That is how books are
+        written, so it is qualified rather than refused."""
+        self.assertEqual([t.filename for t in self.canon.topics],
+                         ["Introduction (1.1).md", "Introduction (2.1).md"])
+
+    def test_repeats_are_reported_by_ref_not_by_canon(self) -> None:
+        self.assertEqual(curriculum.repeats(self.canon),
+                         {"Introduction": ["1.1", "2.1"]})
+
+    def test_overlaps_counts_distinct_canons(self) -> None:
+        """A book reusing a title in sixteen chapters is not sixteen sources
+        covering it, and reporting it as "ASM, ASM, ASM" was worse than
+        useless."""
+        self.assertEqual(curriculum.overlaps([self.canon]), {})
+
+    def test_qualifiers_compose_across_both_causes(self) -> None:
+        """A title repeated inside one canon AND shared with another needs
+        both qualifiers, or one of the two notes is still ambiguous."""
+        with tempfile.TemporaryDirectory() as directory:
+            (Path(directory) / "a.toml").write_text(BOOK)
+            (Path(directory) / "b.toml").write_text(
+                BOOK.replace('id = "split-book"', 'id = "other-book"')
+                    .replace('short = "SPLIT"', 'short = "OTHER"'))
+            first = load_all(directory)[0]
+            names = [t.filename for t in first.topics]
+            self.assertEqual(names, ["Introduction (1.1 · SPLIT).md",
+                                     "Introduction (2.1 · SPLIT).md"])
+            self.assertEqual(len(set(names)), 2)
+
+    def test_the_note_records_the_file_and_pages(self) -> None:
+        body = curriculum.note_body(self.canon, self.canon.topics[1])
+        self.assertIn('file: "ch2"', body)
+        self.assertIn('pages: "31-44"', body)
+        self.assertIn("SPLIT — Chapter 2 — pp. 31-44", body)
+
+
+class TestTheASMCanon(unittest.TestCase):
+    """The set text for the live class. Imported from the book's own Contents
+    PDF, so the citation and the source are the same file."""
+
+    def canon(self) -> curriculum.Canon:
+        path = REPO_CANON / "kery-asm.toml"
+        if not path.exists():
+            self.skipTest("ASM canon not mounted")
+        return load(path)
+
+    def test_it_loads_with_a_file_per_chapter(self) -> None:
+        canon = self.canon()
+        self.assertEqual(canon.kind, "text")
+        self.assertEqual(len(canon.files), 21)
+        self.assertEqual(len(canon.units), 21)
+
+    def test_every_topic_resolves_to_a_page_range(self) -> None:
+        """The whole point of the import. A topic that cannot be located is a
+        topic the lesson has to guess at."""
+        canon = self.canon()
+        for topic in canon.topics:
+            with self.subTest(ref=topic.ref):
+                self.assertIsNotNone(canon.locate(topic))
+
+    def test_page_ranges_stay_inside_their_chapter(self) -> None:
+        canon = self.canon()
+        starts = {f.id: 1 - f.page_offset for f in canon.files}
+        for topic in canon.topics:
+            first, last = topic.page_range
+            with self.subTest(ref=topic.ref):
+                self.assertGreaterEqual(first, starts[topic.file])
+                self.assertGreaterEqual(last, first)
+
+    def test_refs_match_their_chapter_and_unit(self) -> None:
+        """A topic filed under the wrong chapter would read the wrong PDF."""
+        canon = self.canon()
+        for topic in canon.topics:
+            with self.subTest(ref=topic.ref):
+                self.assertEqual(topic.file, "ch" + topic.ref.split(".")[0])
+                self.assertTrue(
+                    topic.unit.startswith(f"Chapter {topic.ref.split('.')[0]}:"),
+                    topic.unit)
