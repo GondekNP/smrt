@@ -11,6 +11,7 @@ updating seeder could overwrite a relevance decision. It must not be able to.
 
 from __future__ import annotations
 
+import re
 import tempfile
 import unittest
 from pathlib import Path
@@ -201,6 +202,35 @@ class TestAudit(unittest.TestCase):
             self.assertEqual(len(report.holes), 2)
 
 
+class TestLoadAll(unittest.TestCase):
+    def test_the_same_title_in_two_courses_is_refused(self) -> None:
+        """Seeding puts each course in its own directory, so nothing is
+        overwritten -- but Obsidian resolves wikilinks by filename across the
+        whole vault, so a duplicate makes the link AMBIGUOUS rather than
+        broken. It silently resolves to whichever note Obsidian picks."""
+        with tempfile.TemporaryDirectory() as directory:
+            first = Path(directory) / "a.toml"
+            first.write_text(MINIMAL)
+            second = Path(directory) / "b.toml"
+            second.write_text(
+                MINIMAL.replace('id = "test-101"', 'id = "test-202"')
+                       .replace('number = "TEST.101"', 'number = "TEST.202"')
+            )
+            with self.assertRaisesRegex(CanonError, "ambiguous"):
+                load_all(directory)
+
+    def test_distinct_courses_load_together(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            (Path(directory) / "a.toml").write_text(MINIMAL)
+            (Path(directory) / "b.toml").write_text(
+                MINIMAL.replace('id = "test-101"', 'id = "test-202"')
+                       .replace('number = "TEST.101"', 'number = "TEST.202"')
+                       .replace('name = "First Thing"', 'name = "Other Thing"')
+                       .replace('name = "Second: Thing"', 'name = "Another Thing"')
+            )
+            self.assertEqual(len(load_all(directory)), 2)
+
+
 class TestTheRealCanon(unittest.TestCase):
     """The checked-in canon has to load, because everything downstream of it
     assumes it does."""
@@ -212,6 +242,36 @@ class TestTheRealCanon(unittest.TestCase):
             self.assertTrue(canon.url.startswith("https://"), canon.course_id)
             self.assertTrue(canon.verified, canon.course_id)
             self.assertTrue(canon.topics, canon.course_id)
+
+    def test_the_first_import_set_is_present(self) -> None:
+        """18.06SC, 18.05, 18.655 and 6.438 -- the spine for foundations of
+        Bayesian modelling, per docs/curriculum.md."""
+        if not REPO_CANON.is_dir():
+            self.skipTest(f"{REPO_CANON} not mounted")
+        numbers = {c.number for c in load_all(REPO_CANON)}
+        self.assertLessEqual({"18.06SC", "18.05", "18.655", "6.438"}, numbers)
+
+    def test_every_canon_records_what_it_excluded(self) -> None:
+        """"What did the import leave out" has to be answerable, so the field
+        is mandatory in practice even though the schema allows it to be
+        empty."""
+        if not REPO_CANON.is_dir():
+            self.skipTest(f"{REPO_CANON} not mounted")
+        for canon in load_all(REPO_CANON):
+            self.assertTrue(canon.excluded,
+                            f"{canon.number} does not say what it excluded")
+
+    def test_no_assessment_sneaked_in_as_a_topic(self) -> None:
+        # Word boundaries, not substrings: the first version of this flagged
+        # 18.05's "Introduction to Statistics, Examples, Likelihood, MLE"
+        # because "examples" contains "exam".
+        assessment = re.compile(r"\b(exam|quiz|midterm|final)\b", re.IGNORECASE)
+        if not REPO_CANON.is_dir():
+            self.skipTest(f"{REPO_CANON} not mounted")
+        for canon in load_all(REPO_CANON):
+            for topic in canon.topics:
+                self.assertIsNone(assessment.search(topic.name),
+                                  f"{canon.number} {topic.ref}: {topic.name}")
 
     def test_18_06_has_its_three_units(self) -> None:
         path = REPO_CANON / "mit-18.06sc.toml"

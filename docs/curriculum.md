@@ -177,9 +177,31 @@ Ordered by role in reaching Bayesian modelling.
 | 6.438 | Algorithms for Inference | **Bayesian networks, factor graphs, belief propagation, variational inference.** Where "Bayesian modelling" stops being a formula and becomes a method |
 | 18.S096 | Matrix Calculus for Machine Learning and Beyond | The direct answer to the 3D-versus-hypervolumes complaint: matrix calculus is the $n$-dimensional framing of the same derivatives |
 
-Suggested first import set for foundations of Bayesian modelling: **18.06SC,
-18.05, 18.655, 6.438**, with 18.02 as the prerequisite check and 18.S096 as the
-reframing companion to 18.06.
+**The first import set is done** — 18.06SC, 18.05, 18.655 and 6.438, 100 topics
+in total, seeding cleanly into a vault. 18.02 as the prerequisite check and
+18.S096 as the reframing companion to 18.06 are not yet imported.
+
+| Canon | Topics | Units | Excluded |
+|---|---|---|---|
+| 18.05 | 24 | 4 | 2 exams, a review session, an R quiz |
+| 18.06SC | 32 | 3 | 3 exam-review sessions |
+| 18.655 | 21 | 1 | none |
+| 6.438 | 23 | 1 | none |
+
+Three things the imports forced, all recorded in the canon files themselves
+rather than fixed quietly:
+
+- **18.05's source summary disagreed with its own list.** The page claimed 26
+  regular sessions; the enumerated sessions yield 24 once the R quiz is
+  excluded. The enumerated list is what was recorded, and the canon says to
+  re-check the calendar if a topic looks missing.
+- **Merged sessions stay merged.** 18.655 lectures 20-25 are one topic in the
+  source (six sessions on generalized linear models) and 6.438's 15-16 likewise.
+  They are recorded as single refs `L20-25` and `L15-16`; splitting them would
+  invent structure the syllabus does not state.
+- **Numbering gaps are meaningful.** 18.05 skips sessions 8, 9 and 21 because
+  those are assessments, and the canon says so rather than leaving a reader to
+  wonder whether the import dropped something.
 
 Not yet verified, and worth checking before relying on it: **18.065**, Strang's
 matrix-methods-for-data-analysis course, which may be a better companion to

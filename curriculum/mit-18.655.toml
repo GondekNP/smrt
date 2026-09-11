@@ -1,0 +1,123 @@
+# MIT 18.655 — Mathematical Statistics
+#
+# THE CANON. Reviewed, cited, never edited by an agent. See docs/curriculum.md.
+#
+# Graduate level. Decision theory, Bayes procedures, exponential families and
+# asymptotics -- the theory under the methods 18.05 introduces.
+#
+# Verified against the OCW lecture-notes page on 2026-09-11.
+
+[course]
+id = "mit-18.655"
+number = "18.655"
+title = "Mathematical Statistics"
+institution = "MIT"
+url = "https://ocw.mit.edu/courses/18-655-mathematical-statistics-spring-2016/"
+verified = "2026-09-11"
+excluded = "none"
+note = "Sessions 20-25 are one topic in the source (six sessions on Generalized Linear Models) and are recorded as the single ref L20-25. Splitting them would invent a structure the syllabus does not state."
+
+[[topic]]
+ref = "L01"
+unit = "Mathematical Statistics"
+name = "Course Overview"
+
+[[topic]]
+ref = "L02"
+unit = "Mathematical Statistics"
+name = "Statistical Models"
+
+[[topic]]
+ref = "L03"
+unit = "Mathematical Statistics"
+name = "Bayesian Models"
+
+[[topic]]
+ref = "L04"
+unit = "Mathematical Statistics"
+name = "Decision Theoretic Framework"
+
+[[topic]]
+ref = "L05"
+unit = "Mathematical Statistics"
+name = "Prediction"
+
+[[topic]]
+ref = "L06"
+unit = "Mathematical Statistics"
+name = "Sufficiency"
+
+[[topic]]
+ref = "L07"
+unit = "Mathematical Statistics"
+name = "Exponential Families I"
+
+[[topic]]
+ref = "L08"
+unit = "Mathematical Statistics"
+name = "Exponential Families II"
+
+[[topic]]
+ref = "L09"
+unit = "Mathematical Statistics"
+name = "Methods of Estimation I"
+
+[[topic]]
+ref = "L10"
+unit = "Mathematical Statistics"
+name = "Methods of Estimation II"
+
+[[topic]]
+ref = "L11"
+unit = "Mathematical Statistics"
+name = "Bayes Procedures"
+
+[[topic]]
+ref = "L12"
+unit = "Mathematical Statistics"
+name = "Minimax Procedures"
+
+[[topic]]
+ref = "L13"
+unit = "Mathematical Statistics"
+name = "Unbiased Estimation and Risk Inequalities"
+
+[[topic]]
+ref = "L14"
+unit = "Mathematical Statistics"
+name = "Convergence of Random Variables; Probability Inequalities"
+
+[[topic]]
+ref = "L15"
+unit = "Mathematical Statistics"
+name = "Limit Theorems"
+
+[[topic]]
+ref = "L16"
+unit = "Mathematical Statistics"
+name = "Asymptotics I: Consistency and Delta Method"
+
+[[topic]]
+ref = "L17"
+unit = "Mathematical Statistics"
+name = "Asymptotics II: Limiting Distributions"
+
+[[topic]]
+ref = "L18"
+unit = "Mathematical Statistics"
+name = "Asymptotics III: Bayes Inference and Large-Sample Tests"
+
+[[topic]]
+ref = "L19"
+unit = "Mathematical Statistics"
+name = "Gaussian Linear Models"
+
+[[topic]]
+ref = "L20-25"
+unit = "Mathematical Statistics"
+name = "Generalized Linear Models"
+
+[[topic]]
+ref = "L26"
+unit = "Mathematical Statistics"
+name = "Case Study: Applying Generalized Linear Models"

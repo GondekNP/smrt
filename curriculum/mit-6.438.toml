@@ -1,0 +1,134 @@
+# MIT 6.438 — Algorithms for Inference
+#
+# THE CANON. Reviewed, cited, never edited by an agent. See docs/curriculum.md.
+#
+# Where "Bayesian modelling" stops being a formula and becomes a method:
+# Bayesian networks, factor graphs, belief propagation, variational inference,
+# MCMC. The sink of the DAG for this goal.
+#
+# Verified against the OCW lecture-notes page on 2026-09-11.
+
+[course]
+id = "mit-6.438"
+number = "6.438"
+title = "Algorithms for Inference"
+institution = "MIT"
+url = "https://ocw.mit.edu/courses/6-438-algorithms-for-inference-fall-2014/"
+verified = "2026-09-11"
+excluded = "none"
+note = "Lectures 15-16 are one topic in the source and are recorded as the single ref L15-16."
+
+[[topic]]
+ref = "L01"
+unit = "Algorithms for Inference"
+name = "Course Overview and Preliminaries"
+
+[[topic]]
+ref = "L02"
+unit = "Algorithms for Inference"
+name = "Directed Graphical Models"
+
+[[topic]]
+ref = "L03"
+unit = "Algorithms for Inference"
+name = "Undirected Graphical Models"
+
+[[topic]]
+ref = "L04"
+unit = "Algorithms for Inference"
+name = "Factor Graphs and Comparing Graphical Model Types"
+
+[[topic]]
+ref = "L05"
+unit = "Algorithms for Inference"
+name = "Minimal I-Maps, Chordal Graphs, Trees, and Markov Chains"
+
+[[topic]]
+ref = "L06"
+unit = "Algorithms for Inference"
+name = "Gaussian Graphical Models"
+
+[[topic]]
+ref = "L07"
+unit = "Algorithms for Inference"
+name = "Inference On Graphs: The Elimination Algorithm"
+
+[[topic]]
+ref = "L08"
+unit = "Algorithms for Inference"
+name = "Inference On Trees: Sum-Product Algorithm"
+
+[[topic]]
+ref = "L09"
+unit = "Algorithms for Inference"
+name = "Forward-Backward Algorithm, Sum-Product On Factor Graphs"
+
+[[topic]]
+ref = "L10"
+unit = "Algorithms for Inference"
+name = "Sum-Product On Factor Graphs, MAP Elimination"
+
+[[topic]]
+ref = "L11"
+unit = "Algorithms for Inference"
+name = "The Max-Product Algorithm"
+
+[[topic]]
+ref = "L12"
+unit = "Algorithms for Inference"
+name = "Gaussian Belief Propagation"
+
+[[topic]]
+ref = "L13"
+unit = "Algorithms for Inference"
+name = "BP on Gaussian Hidden Markov Models: Kalman Filtering"
+
+[[topic]]
+ref = "L14"
+unit = "Algorithms for Inference"
+name = "The Junction Tree Algorithm"
+
+[[topic]]
+ref = "L15-16"
+unit = "Algorithms for Inference"
+name = "Loopy Belief Propagation and its Properties"
+
+[[topic]]
+ref = "L17"
+unit = "Algorithms for Inference"
+name = "Variational Inference"
+
+[[topic]]
+ref = "L18"
+unit = "Algorithms for Inference"
+name = "Markov Chain Monte Carlo Methods and Approximate MAP"
+
+[[topic]]
+ref = "L19"
+unit = "Algorithms for Inference"
+name = "Approximate Inference: Importance Sampling and Particle Filters"
+
+[[topic]]
+ref = "L20"
+unit = "Algorithms for Inference"
+name = "Learning Graphical Models"
+
+[[topic]]
+ref = "L21"
+unit = "Algorithms for Inference"
+name = "Learning Parameters of an Undirected Graphical Model"
+
+[[topic]]
+ref = "L22"
+unit = "Algorithms for Inference"
+name = "Parameter Estimation from Partial Observations"
+
+[[topic]]
+ref = "L23"
+unit = "Algorithms for Inference"
+name = "Learning Structure in Directed Graphs"
+
+[[topic]]
+ref = "L24"
+unit = "Algorithms for Inference"
+name = "Learning Exponential Family Models"

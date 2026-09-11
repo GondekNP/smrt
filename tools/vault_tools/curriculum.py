@@ -147,7 +147,27 @@ def load_all(directory: str | Path) -> list[Canon]:
     found = sorted(Path(directory).glob("*.toml"))
     if not found:
         raise CanonError(f"no canon files in {directory}")
-    return [load(path) for path in found]
+    canons = [load(path) for path in found]
+
+    # Within a canon, a filename collision is an error (see `load`). Across
+    # canons it is subtler and worth catching here: seeding puts each course in
+    # its own directory, so nothing is overwritten, but Obsidian resolves
+    # wikilinks by filename across the entire vault. A duplicate makes
+    # `[[Central Limit Theorem]]` AMBIGUOUS rather than broken, which is worse
+    # -- it silently resolves to whichever note Obsidian picks.
+    seen: dict[str, str] = {}
+    clashes: list[str] = []
+    for canon in canons:
+        for topic in canon.topics:
+            other = seen.setdefault(topic.filename, canon.number)
+            if other != canon.number:
+                clashes.append(f"{topic.filename} ({other} and {canon.number})")
+    if clashes:
+        raise CanonError(
+            "topics in different courses share a filename, which makes "
+            f"wikilinks ambiguous: {sorted(clashes)}"
+        )
+    return canons
 
 
 def note_body(canon: Canon, topic: Topic) -> str:
@@ -292,7 +312,9 @@ def main(argv: list[str] | None = None) -> int:
     if action == "list":
         for canon in canons:
             print(f"{canon.number:<10} {canon.title}")
-            print(f"  {len(canon.topics)} topics, {len(canon.units)} units, "
+            units = len(canon.units)
+            print(f"  {len(canon.topics)} topics, {units} "
+                  f"{'unit' if units == 1 else 'units'}, "
                   f"verified {canon.verified}")
             if canon.excluded:
                 print(f"  excluded: {canon.excluded}")

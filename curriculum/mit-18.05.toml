@@ -1,0 +1,140 @@
+# MIT 18.05 — Introduction to Probability and Statistics
+#
+# THE CANON. Reviewed, cited, never edited by an agent. See docs/curriculum.md.
+#
+# The Bayesian on-ramp: a whole unit on Bayesian updating with discrete and
+# continuous priors, conjugate priors, and probability intervals, plus an
+# explicit Bayes-versus-NHST comparison.
+#
+# Verified against the OCW calendar page on 2026-09-11.
+
+[course]
+id = "mit-18.05"
+number = "18.05"
+title = "Introduction to Probability and Statistics"
+institution = "MIT"
+url = "https://ocw.mit.edu/courses/18-05-introduction-to-probability-and-statistics-spring-2022/"
+verified = "2026-09-11"
+prerequisites = "18.02 Multivariable Calculus"
+excluded = "2 exams, 1 review session and 1 R quiz: assessments rather than topics. Their session numbers are the gaps at 8, 9, 21 and the omitted 25."
+note = "The source page's own summary claimed 26 regular sessions; the enumerated list yields 24 after excluding the R quiz. The enumerated list is what is recorded here. Re-check against the calendar page if a topic appears to be missing."
+
+[[topic]]
+ref = "S01"
+unit = "Unit 1: Probability"
+name = "Counting"
+
+[[topic]]
+ref = "S02"
+unit = "Unit 1: Probability"
+name = "Probability Basics"
+
+[[topic]]
+ref = "S03"
+unit = "Unit 1: Probability"
+name = "Conditional Probability, Independence, and Bayes' Theorem"
+
+[[topic]]
+ref = "S04"
+unit = "Unit 1: Probability"
+name = "Discrete Random Variables: Expected Value"
+
+[[topic]]
+ref = "S05a"
+unit = "Unit 1: Probability"
+name = "Variance of Discrete Variables; Continuous Random Variables"
+
+[[topic]]
+ref = "S05b"
+unit = "Unit 1: Probability"
+name = "Continuous Random Variables (continued)"
+
+[[topic]]
+ref = "S06a"
+unit = "Unit 1: Probability"
+name = "Continuous Random Variables: Expected Value and Variance; Histograms"
+
+[[topic]]
+ref = "S06b"
+unit = "Unit 1: Probability"
+name = "Law of Large Numbers, Central Limit Theorem, Histograms"
+
+[[topic]]
+ref = "S07"
+unit = "Unit 1: Probability"
+name = "Joint Distributions: Independence, Covariance, and Correlation"
+
+[[topic]]
+ref = "S10"
+unit = "Unit 2: Statistics: Bayesian Inference"
+name = "Introduction to Statistics, Examples, Likelihood, MLE"
+
+[[topic]]
+ref = "S11"
+unit = "Unit 2: Statistics: Bayesian Inference"
+name = "Bayesian Updating: Discrete Priors"
+
+[[topic]]
+ref = "S12"
+unit = "Unit 2: Statistics: Bayesian Inference"
+name = "Predictive Probabilities, Bayesian Updating: Odds"
+
+[[topic]]
+ref = "S13"
+unit = "Unit 2: Statistics: Bayesian Inference"
+name = "Bayesian Updating: Continuous Prior, Discrete Data"
+
+[[topic]]
+ref = "S14"
+unit = "Unit 2: Statistics: Bayesian Inference"
+name = "Continuous Data with Continuous Priors (Optional)"
+
+[[topic]]
+ref = "S15"
+unit = "Unit 2: Statistics: Bayesian Inference"
+name = "Beta Distributions, Conjugate Priors; Choosing Priors"
+
+[[topic]]
+ref = "S16"
+unit = "Unit 2: Statistics: Bayesian Inference"
+name = "Choosing Priors; Probability Intervals"
+
+[[topic]]
+ref = "S17"
+unit = "Unit 3: Statistics: Frequentist Inference: NHST"
+name = "NHST: Rejection Regions, z-Test"
+
+[[topic]]
+ref = "S18"
+unit = "Unit 3: Statistics: Frequentist Inference: NHST"
+name = "NHST (continued) (t-Tests)"
+
+[[topic]]
+ref = "S19"
+unit = "Unit 3: Statistics: Frequentist Inference: NHST"
+name = "NHST: Distributions Related to Normal Distributions (Chi Square, ANOVA)"
+
+[[topic]]
+ref = "S20"
+unit = "Unit 3: Statistics: Frequentist Inference: NHST"
+name = "Comparison of Bayes and NHST"
+
+[[topic]]
+ref = "S22"
+unit = "Unit 4: Statistics: Confidence Intervals; Regression"
+name = "Confidence Intervals"
+
+[[topic]]
+ref = "S23"
+unit = "Unit 4: Statistics: Confidence Intervals; Regression"
+name = "Confidence Intervals (continued)"
+
+[[topic]]
+ref = "S24"
+unit = "Unit 4: Statistics: Confidence Intervals; Regression"
+name = "Bootstrap Confidence Intervals"
+
+[[topic]]
+ref = "S26"
+unit = "Unit 4: Statistics: Confidence Intervals; Regression"
+name = "Linear and Multiple Regression"
