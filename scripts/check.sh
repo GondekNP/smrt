@@ -38,7 +38,7 @@ docker run --rm "$IMAGE" bash -c '
 for c in toad claude claude-agent-acp opencode \
          smrt-acp-proxy smrt-mcp-probe vault-tools \
          smrt-curriculum smrt-ledger \
-         pixi git rg python3; do
+         pixi git rg pdftotext python3; do
     if command -v "$c" >/dev/null 2>&1; then
         printf "  %-17s %s\n" "$c" "$(command -v "$c")"
     else
@@ -65,12 +65,14 @@ print(\"  %-17s %d placeholder: %s\" % (\"\", len(s.PLACEHOLDERS),
                                        \", \".join(s.PLACEHOLDERS)))
 " || printf "  %-17s BROKEN\n" "vault_tools"
 # The canon is baked in, so a malformed one should fail here rather than in a
-# lesson. load_all also refuses two courses that share a topic filename.
+# lesson. load_all also scopes the filenames of topics two canons share.
 python3 -c "
 from vault_tools.curriculum import load_all
 canons = load_all(\"/workspace/curriculum\")
-print(\"  %-17s %d courses, %d topics\" % (\"curriculum\", len(canons),
-                                          sum(len(c.topics) for c in canons)))
+kinds = \", \".join(sorted(\"%d %s\" % (len([c for c in canons if c.kind == k]), k)
+                            for k in {c.kind for c in canons}))
+print(\"  %-17s %d canons (%s), %d topics\" % (\"curriculum\", len(canons), kinds,
+                                              sum(len(c.topics) for c in canons)))
 " || printf "  %-17s BROKEN\n" "curriculum"
 '
 

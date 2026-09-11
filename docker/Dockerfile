@@ -20,12 +20,18 @@ ENV DEBIAN_FRONTEND=noninteractive \
 
 # --- system packages -------------------------------------------------------
 # ripgrep is load-bearing: the tutor agent greps rather than recalling.
+# poppler-utils for the same reason one step further out. /subject is
+# documented as possibly "a folder of PDFs", and rg cannot read one -- so a
+# textbook or a paper could be pointed at but never searched. `pdftotext
+# -f/-l` also extracts by page, which is what makes a locator in the canon
+# worth recording: 18 pages into context instead of 700.
 RUN apt-get update && apt-get install -y --no-install-recommends \
         ca-certificates \
         curl \
         git \
         gnupg \
         less \
+        poppler-utils \
         ripgrep \
         sudo \
         tini \
