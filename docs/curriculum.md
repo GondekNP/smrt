@@ -110,6 +110,58 @@ superset is legible as a superset. The work is expected to be a subset of the
 canon in places and a superset in others; both are fine, and only the second
 needs marking.
 
+## How it fits together
+
+Grouped by **write scope**, because that is the organizing constraint rather
+than a filesystem detail: the canon is reviewed and never written by the agent,
+the source is a read-only mount, and only the vault is writable.
+
+```mermaid
+flowchart TB
+  subgraph repo["the repo — human-reviewed, never written by the agent"]
+    canon["curriculum/*.toml<br/>kind: course · text · paper<br/>ref · unit · name<br/>+ locator — where in the source"]
+  end
+
+  subgraph subject["/subject — read-only mount"]
+    src["the source itself<br/>book.pdf · lecture notes · a paper"]
+  end
+
+  subgraph vault["/vault — read-write, a git repo, your Obsidian vault"]
+    topic["curriculum/CANON/TOPIC.md<br/>─────────<br/>canon fields · seeded once<br/>relevance + note · yours alone"]
+    concept["concepts/TERM.md<br/>unnamed_streak · gate"]
+    outcome["notes/…<br/>quiz and explain records"]
+  end
+
+  agent(["the teach skill"])
+
+  canon -->|"seed — creates, never modifies"| topic
+  canon -.->|"audit — holes · orphans · unjudged · renames"| topic
+
+  topic -->|"is this in scope, and whose framing"| agent
+  topic -.->|"locator: pp. 108-113"| src
+  src -->|"pdftotext -f 108 -l 113<br/>the node, not the book"| agent
+
+  agent -->|"notation and scope from the text,<br/>the explanation still yours to improve"| outcome
+  agent -->|"named / unnamed"| concept
+  concept -->|"tier decides what the rubric may assume"| agent
+  outcome -->|"outcomes: [[…]]"| topic
+```
+
+Four things the diagram is meant to make obvious:
+
+- **The only cycle runs through the vault.** Teaching writes evidence, evidence
+  attaches to the topic note, and the topic note shapes the next lesson. The
+  canon and the source never learn anything, which is what makes them a fixed
+  reference to measure against.
+- **`locator` is a dotted edge, not a copy.** It is a pointer from the vault
+  into the read-only source. Nothing extracts the book into the vault.
+- **The two arrows into the agent carry different authority.** The topic note
+  says what is in scope; the source says how it is written. Neither says how to
+  explain it.
+- **The concept ledger is the only edge that constrains the agent.** Everything
+  else informs it. `gated` is a refusal, and it is enforced in the tool rather
+  than requested in a prompt.
+
 ## Three kinds of source, one import path
 
 A canon is not always a course. Added 2026-09-11, when the first real need
