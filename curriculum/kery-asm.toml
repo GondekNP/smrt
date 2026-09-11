@@ -1,0 +1,1378 @@
+# Kéry & Kellner, Applied Statistical Modelling for Ecologists (2024)
+#
+# THE CANON. Reviewed, cited, never edited by an agent. See docs/curriculum.md.
+#
+# The set text for ESPM 215 (Hierarchical Bayes). Imported from the book's own
+# Contents PDF rather than from a recalled or web-scraped table of contents --
+# which is the strongest verification available here, since the source and the
+# thing being cited are the same file.
+#
+# Granularity is x.y sections. The book also has x.y.z subsections; those are
+# deliberately not topics, because 500 nodes would multiply notes without
+# improving the coverage audit, and the course plan assigns work by section
+# ("Ch. 2.1-2.3"). Page ranges run from a section's start to the page before
+# the next one, so a subsection is always inside its parent's range.
+#
+# Each chapter is a separate PDF, so each has its own page_offset. Offsets are
+# computed as 1 - (the chapter's printed start page) and verified against the
+# PDFs: chapter 2's pdf page 1 carries printed page 15, chapter 5's carries
+# 147. Getting an offset wrong extracts the wrong pages silently, so this is
+# measured rather than assumed.
+
+[source]
+kind = "text"
+id = "kery-asm"
+short = "ASM"
+title = "Applied Statistical Modelling for Ecologists"
+author = "Marc Kéry and Kenneth F. Kellner"
+edition = "2024, Elsevier; ISBN 978-0-443-13715-0"
+url = "https://www.elsevier.com/books-and-journals/book-companion/9780443137150"
+verified = "2026-09-11"
+root = "Hierarchical Bayes/Chapters"
+prerequisites = "R. The book teaches the statistics and assumes the programming."
+excluded = "front and back matter (title page, dedication, foreword, acknowledgments, copyright, contents, bibliography, index) and the x.y.z subsections: not topics to learn"
+note = "Subtitle: A Practical Guide to Bayesian and Likelihood Inference Using R, JAGS, NIMBLE, Stan and TMB. The CompanionR/ directory beside Chapters/ holds the book's own R script per chapter."
+
+[[file]]
+id = "ch1"
+path = "Chapter-1---Introduction-----This-book-has-a-companion-webs_2024_Applied-Sta.pdf"
+page_offset = 0   # pdf page 1 is printed page 1
+
+[[file]]
+id = "ch2"
+path = "Chapter-2---Introduction-to-statistical-inference-----This-b_2024_Applied-St.pdf"
+page_offset = -14   # pdf page 1 is printed page 15
+
+[[file]]
+id = "ch3"
+path = "Chapter-3---Linear-regression-models-and-their-extensions-to-g_2024_Applied-.pdf"
+page_offset = -76   # pdf page 1 is printed page 77
+
+[[file]]
+id = "ch4"
+path = "Chapter-4---Introduction-to-general-purpose-model-fitting-engi_2024_Applied-.pdf"
+page_offset = -108   # pdf page 1 is printed page 109
+
+[[file]]
+id = "ch5"
+path = "Chapter-5---Normal-linear-regression-----This-book-has-a-com_2024_Applied-St.pdf"
+page_offset = -146   # pdf page 1 is printed page 147
+
+[[file]]
+id = "ch6"
+path = "Chapter-6---Comparing-two-groups-in-a-normal-model-----This-_2024_Applied-St.pdf"
+page_offset = -170   # pdf page 1 is printed page 171
+
+[[file]]
+id = "ch7"
+path = "Chapter-7---Models-with-a-single-categorical-covariate-with-m_2024_Applied-S.pdf"
+page_offset = -190   # pdf page 1 is printed page 191
+
+[[file]]
+id = "ch8"
+path = "Chapter-8---Comparisons-along-two-classifications-in-a-model-_2024_Applied-S.pdf"
+page_offset = -218   # pdf page 1 is printed page 219
+
+[[file]]
+id = "ch9"
+path = "Chapter-9---General-linear-model-for-a-normal-response-with-co_2024_Applied-.pdf"
+page_offset = -242   # pdf page 1 is printed page 243
+
+[[file]]
+id = "ch10"
+path = "Chapter-10---Linear-mixed-effects-model-----This-book-has-a-_2024_Applied-St.pdf"
+page_offset = -256   # pdf page 1 is printed page 257
+
+[[file]]
+id = "ch11"
+path = "Chapter-11---Introduction-to-the-generalized-linear-model--GLM_2024_Applied-.pdf"
+page_offset = -294   # pdf page 1 is printed page 295
+
+[[file]]
+id = "ch12"
+path = "Chapter-12---Overdispersion--zero-inflation--and-offsets-in-a_2024_Applied-S.pdf"
+page_offset = -312   # pdf page 1 is printed page 313
+
+[[file]]
+id = "ch13"
+path = "Chapter-13---Poisson-GLM-with-continuous-and-categorical-expl_2024_Applied-S.pdf"
+page_offset = -336   # pdf page 1 is printed page 337
+
+[[file]]
+id = "ch14"
+path = "Chapter-14---Poisson-generalized-linear-mixed-model--or-Poiss_2024_Applied-S.pdf"
+page_offset = -348   # pdf page 1 is printed page 349
+
+[[file]]
+id = "ch15"
+path = "Chapter-15---Comparing-two-groups-in-a-logistic-regression-mo_2024_Applied-S.pdf"
+page_offset = -362   # pdf page 1 is printed page 363
+
+[[file]]
+id = "ch16"
+path = "Chapter-16---Binomial-GLM-with-continuous-and-categorical-exp_2024_Applied-S.pdf"
+page_offset = -374   # pdf page 1 is printed page 375
+
+[[file]]
+id = "ch17"
+path = "Chapter-17---Binomial-generalized-linear-mixed-model-----Thi_2024_Applied-St.pdf"
+page_offset = -386   # pdf page 1 is printed page 387
+
+[[file]]
+id = "ch18"
+path = "Chapter-18---Model-building--model-checking--and-model-select_2024_Applied-S.pdf"
+page_offset = -400   # pdf page 1 is printed page 401
+
+[[file]]
+id = "ch19"
+path = "Chapter-19---Occupancy-models-----This-book-has-a-companion_2024_Applied-Sta.pdf"
+page_offset = -446   # pdf page 1 is printed page 447
+
+[[file]]
+id = "ch20"
+path = "Chapter-20---Integrated-models-----This-book-has-a-companion_2024_Applied-St.pdf"
+page_offset = -472   # pdf page 1 is printed page 473
+
+[[file]]
+id = "ch21"
+path = "Chapter-21---Conclusion-----This-book-has-a-companion-websi_2024_Applied-Sta.pdf"
+page_offset = -496   # pdf page 1 is printed page 497
+
+[[topic]]
+ref = "1.1"
+unit = "Chapter 1: Introduction"
+name = "Statistical models and why you need them"
+file = "ch1"
+pages = "2-3"
+
+[[topic]]
+ref = "1.2"
+unit = "Chapter 1: Introduction"
+name = "Why linear statistical models?"
+file = "ch1"
+pages = "4"
+
+[[topic]]
+ref = "1.3"
+unit = "Chapter 1: Introduction"
+name = "Why go beyond the linear model?"
+file = "ch1"
+pages = "5"
+
+[[topic]]
+ref = "1.4"
+unit = "Chapter 1: Introduction"
+name = "Random effects and why you need them"
+file = "ch1"
+pages = "5"
+
+[[topic]]
+ref = "1.5"
+unit = "Chapter 1: Introduction"
+name = "Why do you need both Bayesian and non-Bayesian statistical inference?"
+file = "ch1"
+pages = "5"
+
+[[topic]]
+ref = "1.6"
+unit = "Chapter 1: Introduction"
+name = "More reasons for why you should really understand maximum likelihood"
+file = "ch1"
+pages = "6"
+
+[[topic]]
+ref = "1.7"
+unit = "Chapter 1: Introduction"
+name = "The data simulation/model fitting dualism"
+file = "ch1"
+pages = "6-7"
+
+[[topic]]
+ref = "1.8"
+unit = "Chapter 1: Introduction"
+name = "The “experimental approach” to statistics"
+file = "ch1"
+pages = "8"
+
+[[topic]]
+ref = "1.9"
+unit = "Chapter 1: Introduction"
+name = "The first principle of modeling: start simple!"
+file = "ch1"
+pages = "9"
+
+[[topic]]
+ref = "1.10"
+unit = "Chapter 1: Introduction"
+name = "Overview of the ASM book and additional resources"
+file = "ch1"
+pages = "9-10"
+
+[[topic]]
+ref = "1.11"
+unit = "Chapter 1: Introduction"
+name = "How to use the ASM book for self-study and in courses"
+file = "ch1"
+pages = "11-12"
+
+[[topic]]
+ref = "1.12"
+unit = "Chapter 1: Introduction"
+name = "Summary and outlook"
+file = "ch1"
+pages = "13-14"
+
+[[topic]]
+ref = "2.1"
+unit = "Chapter 2: Introduction to statistical inference"
+name = "Probability as the basis for statistical inference"
+file = "ch2"
+pages = "16-18"
+
+[[topic]]
+ref = "2.2"
+unit = "Chapter 2: Introduction to statistical inference"
+name = "Random variables and their description by probability distributions"
+file = "ch2"
+pages = "19-26"
+
+[[topic]]
+ref = "2.3"
+unit = "Chapter 2: Introduction to statistical inference"
+name = "Statistical models and their usages"
+file = "ch2"
+pages = "27-29"
+
+[[topic]]
+ref = "2.4"
+unit = "Chapter 2: Introduction to statistical inference"
+name = "The likelihood function"
+file = "ch2"
+pages = "30"
+
+[[topic]]
+ref = "2.5"
+unit = "Chapter 2: Introduction to statistical inference"
+name = "Classical inference by maximum likelihood and its application to a single-parameter model"
+file = "ch2"
+pages = "31-44"
+
+[[topic]]
+ref = "2.6"
+unit = "Chapter 2: Introduction to statistical inference"
+name = "Maximum likelihood estimation in a two-parameter model"
+file = "ch2"
+pages = "45-52"
+
+[[topic]]
+ref = "2.7"
+unit = "Chapter 2: Introduction to statistical inference"
+name = "Bayesian inference using posterior distributions"
+file = "ch2"
+pages = "53-59"
+
+[[topic]]
+ref = "2.8"
+unit = "Chapter 2: Introduction to statistical inference"
+name = "Bayesian computation by Markov chain Monte Carlo (MCMC)"
+file = "ch2"
+pages = "60-72"
+
+[[topic]]
+ref = "2.9"
+unit = "Chapter 2: Introduction to statistical inference"
+name = "So should you now be a Bayesian or a frequentist?"
+file = "ch2"
+pages = "73"
+
+[[topic]]
+ref = "2.10"
+unit = "Chapter 2: Introduction to statistical inference"
+name = "Summary and outlook"
+file = "ch2"
+pages = "74-76"
+
+[[topic]]
+ref = "3.1"
+unit = "Chapter 3: Linear regression models and their extensions to generalized linear, hierarchical, and integrated models"
+name = "Introduction"
+file = "ch3"
+pages = "77"
+
+[[topic]]
+ref = "3.2"
+unit = "Chapter 3: Linear regression models and their extensions to generalized linear, hierarchical, and integrated models"
+name = "Statistical distributions for the random variables in our model"
+file = "ch3"
+pages = "78-84"
+
+[[topic]]
+ref = "3.3"
+unit = "Chapter 3: Linear regression models and their extensions to generalized linear, hierarchical, and integrated models"
+name = "Link functions to model parameters on a transformed scale"
+file = "ch3"
+pages = "85"
+
+[[topic]]
+ref = "3.4"
+unit = "Chapter 3: Linear regression models and their extensions to generalized linear, hierarchical, and integrated models"
+name = "Linear modeling of covariate effects"
+file = "ch3"
+pages = "86-105"
+
+[[topic]]
+ref = "3.5"
+unit = "Chapter 3: Linear regression models and their extensions to generalized linear, hierarchical, and integrated models"
+name = "Brief overview of linear, generalized linear, (generalized) linear mixed, hierarchical, and integrated models"
+file = "ch3"
+pages = "106"
+
+[[topic]]
+ref = "3.6"
+unit = "Chapter 3: Linear regression models and their extensions to generalized linear, hierarchical, and integrated models"
+name = "Summary and outlook"
+file = "ch3"
+pages = "107-108"
+
+[[topic]]
+ref = "4.1"
+unit = "Chapter 4: Introduction to general-purpose model fitting engines and the “model of the mean”"
+name = "Introduction"
+file = "ch4"
+pages = "109"
+
+[[topic]]
+ref = "4.2"
+unit = "Chapter 4: Introduction to general-purpose model fitting engines and the “model of the mean”"
+name = "Data generation"
+file = "ch4"
+pages = "110-112"
+
+[[topic]]
+ref = "4.3"
+unit = "Chapter 4: Introduction to general-purpose model fitting engines and the “model of the mean”"
+name = "Analysis using canned functions in R"
+file = "ch4"
+pages = "113"
+
+[[topic]]
+ref = "4.4"
+unit = "Chapter 4: Introduction to general-purpose model fitting engines and the “model of the mean”"
+name = "JAGS"
+file = "ch4"
+pages = "113-124"
+
+[[topic]]
+ref = "4.5"
+unit = "Chapter 4: Introduction to general-purpose model fitting engines and the “model of the mean”"
+name = "NIMBLE"
+file = "ch4"
+pages = "125-130"
+
+[[topic]]
+ref = "4.6"
+unit = "Chapter 4: Introduction to general-purpose model fitting engines and the “model of the mean”"
+name = "Stan"
+file = "ch4"
+pages = "131-135"
+
+[[topic]]
+ref = "4.7"
+unit = "Chapter 4: Introduction to general-purpose model fitting engines and the “model of the mean”"
+name = "Maximum likelihood in R"
+file = "ch4"
+pages = "136-140"
+
+[[topic]]
+ref = "4.8"
+unit = "Chapter 4: Introduction to general-purpose model fitting engines and the “model of the mean”"
+name = "Maximum likelihood using Template Model Builder (TMB)"
+file = "ch4"
+pages = "141-145"
+
+[[topic]]
+ref = "4.9"
+unit = "Chapter 4: Introduction to general-purpose model fitting engines and the “model of the mean”"
+name = "Comparison of engines and concluding remarks"
+file = "ch4"
+pages = "146"
+
+[[topic]]
+ref = "5.1"
+unit = "Chapter 5: Normal linear regression"
+name = "Introduction"
+file = "ch5"
+pages = "147-148"
+
+[[topic]]
+ref = "5.2"
+unit = "Chapter 5: Normal linear regression"
+name = "Data generation"
+file = "ch5"
+pages = "149"
+
+[[topic]]
+ref = "5.3"
+unit = "Chapter 5: Normal linear regression"
+name = "Analysis with canned functions in R"
+file = "ch5"
+pages = "150-153"
+
+[[topic]]
+ref = "5.4"
+unit = "Chapter 5: Normal linear regression"
+name = "Bayesian analysis with JAGS"
+file = "ch5"
+pages = "154-163"
+
+[[topic]]
+ref = "5.5"
+unit = "Chapter 5: Normal linear regression"
+name = "Bayesian analysis with NIMBLE"
+file = "ch5"
+pages = "164"
+
+[[topic]]
+ref = "5.6"
+unit = "Chapter 5: Normal linear regression"
+name = "Bayesian analysis with Stan"
+file = "ch5"
+pages = "164-165"
+
+[[topic]]
+ref = "5.7"
+unit = "Chapter 5: Normal linear regression"
+name = "Do-it-yourself maximum likelihood estimates"
+file = "ch5"
+pages = "166"
+
+[[topic]]
+ref = "5.8"
+unit = "Chapter 5: Normal linear regression"
+name = "Likelihood analysis with TMB"
+file = "ch5"
+pages = "167-168"
+
+[[topic]]
+ref = "5.9"
+unit = "Chapter 5: Normal linear regression"
+name = "Comparison of the parameter estimates"
+file = "ch5"
+pages = "169"
+
+[[topic]]
+ref = "5.10"
+unit = "Chapter 5: Normal linear regression"
+name = "Summary and outlook"
+file = "ch5"
+pages = "170"
+
+[[topic]]
+ref = "6.1"
+unit = "Chapter 6: Comparing two groups in a normal model"
+name = "Introduction"
+file = "ch6"
+pages = "171"
+
+[[topic]]
+ref = "6.2"
+unit = "Chapter 6: Comparing two groups in a normal model"
+name = "Comparing two groups with equal variances"
+file = "ch6"
+pages = "172-181"
+
+[[topic]]
+ref = "6.3"
+unit = "Chapter 6: Comparing two groups in a normal model"
+name = "Comparing two groups with unequal variances"
+file = "ch6"
+pages = "182-189"
+
+[[topic]]
+ref = "6.4"
+unit = "Chapter 6: Comparing two groups in a normal model"
+name = "Summary and a comment on the modeling of variances"
+file = "ch6"
+pages = "190"
+
+[[topic]]
+ref = "7.1"
+unit = "Chapter 7: Models with a single categorical covariate with more than two levels"
+name = "Introduction: fixed and random effects"
+file = "ch7"
+pages = "191-194"
+
+[[topic]]
+ref = "7.2"
+unit = "Chapter 7: Models with a single categorical covariate with more than two levels"
+name = "Fixed-effects models"
+file = "ch7"
+pages = "195-201"
+
+[[topic]]
+ref = "7.3"
+unit = "Chapter 7: Models with a single categorical covariate with more than two levels"
+name = "Random-effects models"
+file = "ch7"
+pages = "202-216"
+
+[[topic]]
+ref = "7.4"
+unit = "Chapter 7: Models with a single categorical covariate with more than two levels"
+name = "Summary and outlook"
+file = "ch7"
+pages = "217-218"
+
+[[topic]]
+ref = "8.1"
+unit = "Chapter 8: Comparisons along two classifications in a model with two factors"
+name = "Introduction: main and interaction effects"
+file = "ch8"
+pages = "219-220"
+
+[[topic]]
+ref = "8.2"
+unit = "Chapter 8: Comparisons along two classifications in a model with two factors"
+name = "Data generation"
+file = "ch8"
+pages = "221-222"
+
+[[topic]]
+ref = "8.3"
+unit = "Chapter 8: Comparisons along two classifications in a model with two factors"
+name = "Likelihood analysis with canned functions in R"
+file = "ch8"
+pages = "223-224"
+
+[[topic]]
+ref = "8.4"
+unit = "Chapter 8: Comparisons along two classifications in a model with two factors"
+name = "An aside: using simulation to assess bias and precision of an estimator . . . and to understand what a standard error is"
+file = "ch8"
+pages = "225-227"
+
+[[topic]]
+ref = "8.5"
+unit = "Chapter 8: Comparisons along two classifications in a model with two factors"
+name = "Bayesian analysis with JAGS"
+file = "ch8"
+pages = "228-232"
+
+[[topic]]
+ref = "8.6"
+unit = "Chapter 8: Comparisons along two classifications in a model with two factors"
+name = "Bayesian analysis with NIMBLE"
+file = "ch8"
+pages = "233"
+
+[[topic]]
+ref = "8.7"
+unit = "Chapter 8: Comparisons along two classifications in a model with two factors"
+name = "Bayesian analysis with Stan"
+file = "ch8"
+pages = "233-235"
+
+[[topic]]
+ref = "8.8"
+unit = "Chapter 8: Comparisons along two classifications in a model with two factors"
+name = "Do-it-yourself maximum likelihood estimates"
+file = "ch8"
+pages = "236-237"
+
+[[topic]]
+ref = "8.9"
+unit = "Chapter 8: Comparisons along two classifications in a model with two factors"
+name = "Likelihood analysis with TMB"
+file = "ch8"
+pages = "238-239"
+
+[[topic]]
+ref = "8.10"
+unit = "Chapter 8: Comparisons along two classifications in a model with two factors"
+name = "Comparison of the parameter estimates"
+file = "ch8"
+pages = "240"
+
+[[topic]]
+ref = "8.11"
+unit = "Chapter 8: Comparisons along two classifications in a model with two factors"
+name = "Summary and outlook"
+file = "ch8"
+pages = "240-242"
+
+[[topic]]
+ref = "9.1"
+unit = "Chapter 9: General linear model for a normal response with continuous and categorical explanatory variables"
+name = "Introduction"
+file = "ch9"
+pages = "243-244"
+
+[[topic]]
+ref = "9.2"
+unit = "Chapter 9: General linear model for a normal response with continuous and categorical explanatory variables"
+name = "Data generation"
+file = "ch9"
+pages = "245"
+
+[[topic]]
+ref = "9.3"
+unit = "Chapter 9: General linear model for a normal response with continuous and categorical explanatory variables"
+name = "Likelihood analysis with canned functions in R"
+file = "ch9"
+pages = "246-247"
+
+[[topic]]
+ref = "9.4"
+unit = "Chapter 9: General linear model for a normal response with continuous and categorical explanatory variables"
+name = "Bayesian analysis with JAGS"
+file = "ch9"
+pages = "248-249"
+
+[[topic]]
+ref = "9.5"
+unit = "Chapter 9: General linear model for a normal response with continuous and categorical explanatory variables"
+name = "Bayesian analysis with NIMBLE"
+file = "ch9"
+pages = "250"
+
+[[topic]]
+ref = "9.6"
+unit = "Chapter 9: General linear model for a normal response with continuous and categorical explanatory variables"
+name = "Bayesian analysis with Stan"
+file = "ch9"
+pages = "250-251"
+
+[[topic]]
+ref = "9.7"
+unit = "Chapter 9: General linear model for a normal response with continuous and categorical explanatory variables"
+name = "Do-it-yourself maximum likelihood estimates"
+file = "ch9"
+pages = "252"
+
+[[topic]]
+ref = "9.8"
+unit = "Chapter 9: General linear model for a normal response with continuous and categorical explanatory variables"
+name = "Likelihood analysis with TMB"
+file = "ch9"
+pages = "253-254"
+
+[[topic]]
+ref = "9.9"
+unit = "Chapter 9: General linear model for a normal response with continuous and categorical explanatory variables"
+name = "Comparison of the parameter estimates"
+file = "ch9"
+pages = "255"
+
+[[topic]]
+ref = "9.10"
+unit = "Chapter 9: General linear model for a normal response with continuous and categorical explanatory variables"
+name = "Summary and outlook"
+file = "ch9"
+pages = "255-256"
+
+[[topic]]
+ref = "10.1"
+unit = "Chapter 10: Linear mixed-effects model"
+name = "Introduction"
+file = "ch10"
+pages = "258-259"
+
+[[topic]]
+ref = "10.2"
+unit = "Chapter 10: Linear mixed-effects model"
+name = "Data generation"
+file = "ch10"
+pages = "260-261"
+
+[[topic]]
+ref = "10.3"
+unit = "Chapter 10: Linear mixed-effects model"
+name = "Analysis under a random-intercepts model"
+file = "ch10"
+pages = "262-270"
+
+[[topic]]
+ref = "10.4"
+unit = "Chapter 10: Linear mixed-effects model"
+name = "Analysis under a random-coefficients model without correlation between intercept and slope"
+file = "ch10"
+pages = "271-279"
+
+[[topic]]
+ref = "10.5"
+unit = "Chapter 10: Linear mixed-effects model"
+name = "The random-coefficients model with correlation between intercept and slope"
+file = "ch10"
+pages = "280-292"
+
+[[topic]]
+ref = "10.6"
+unit = "Chapter 10: Linear mixed-effects model"
+name = "Summary and outlook"
+file = "ch10"
+pages = "293-294"
+
+[[topic]]
+ref = "11.1"
+unit = "Chapter 11: Introduction to the generalized linear model (GLM): comparing two groups in a Poisson regression"
+name = "Introduction"
+file = "ch11"
+pages = "295-297"
+
+[[topic]]
+ref = "11.2"
+unit = "Chapter 11: Introduction to the generalized linear model (GLM): comparing two groups in a Poisson regression"
+name = "An important but often forgotten issue with count data"
+file = "ch11"
+pages = "298"
+
+[[topic]]
+ref = "11.3"
+unit = "Chapter 11: Introduction to the generalized linear model (GLM): comparing two groups in a Poisson regression"
+name = "How to deal with missing values in our data"
+file = "ch11"
+pages = "298"
+
+[[topic]]
+ref = "11.4"
+unit = "Chapter 11: Introduction to the generalized linear model (GLM): comparing two groups in a Poisson regression"
+name = "Data generation"
+file = "ch11"
+pages = "299"
+
+[[topic]]
+ref = "11.5"
+unit = "Chapter 11: Introduction to the generalized linear model (GLM): comparing two groups in a Poisson regression"
+name = "Likelihood analysis with canned functions in R"
+file = "ch11"
+pages = "300"
+
+[[topic]]
+ref = "11.6"
+unit = "Chapter 11: Introduction to the generalized linear model (GLM): comparing two groups in a Poisson regression"
+name = "Bayesian analysis with JAGS"
+file = "ch11"
+pages = "301-305"
+
+[[topic]]
+ref = "11.7"
+unit = "Chapter 11: Introduction to the generalized linear model (GLM): comparing two groups in a Poisson regression"
+name = "Bayesian analysis with NIMBLE"
+file = "ch11"
+pages = "306"
+
+[[topic]]
+ref = "11.8"
+unit = "Chapter 11: Introduction to the generalized linear model (GLM): comparing two groups in a Poisson regression"
+name = "Bayesian analysis with Stan"
+file = "ch11"
+pages = "306-307"
+
+[[topic]]
+ref = "11.9"
+unit = "Chapter 11: Introduction to the generalized linear model (GLM): comparing two groups in a Poisson regression"
+name = "Do-it-yourself maximum likelihood estimates"
+file = "ch11"
+pages = "308"
+
+[[topic]]
+ref = "11.10"
+unit = "Chapter 11: Introduction to the generalized linear model (GLM): comparing two groups in a Poisson regression"
+name = "Likelihood analysis with TMB"
+file = "ch11"
+pages = "309"
+
+[[topic]]
+ref = "11.11"
+unit = "Chapter 11: Introduction to the generalized linear model (GLM): comparing two groups in a Poisson regression"
+name = "Comparison of the parameter estimates"
+file = "ch11"
+pages = "310"
+
+[[topic]]
+ref = "11.12"
+unit = "Chapter 11: Introduction to the generalized linear model (GLM): comparing two groups in a Poisson regression"
+name = "Summary and outlook"
+file = "ch11"
+pages = "310-312"
+
+[[topic]]
+ref = "12.1"
+unit = "Chapter 12: Overdispersion, zero inflation, and offsets in a Poisson GLM"
+name = "Introduction"
+file = "ch12"
+pages = "314"
+
+[[topic]]
+ref = "12.2"
+unit = "Chapter 12: Overdispersion, zero inflation, and offsets in a Poisson GLM"
+name = "Overdispersion"
+file = "ch12"
+pages = "314-320"
+
+[[topic]]
+ref = "12.3"
+unit = "Chapter 12: Overdispersion, zero inflation, and offsets in a Poisson GLM"
+name = "Zero inflation"
+file = "ch12"
+pages = "321-328"
+
+[[topic]]
+ref = "12.4"
+unit = "Chapter 12: Overdispersion, zero inflation, and offsets in a Poisson GLM"
+name = "Offsets"
+file = "ch12"
+pages = "329-334"
+
+[[topic]]
+ref = "12.5"
+unit = "Chapter 12: Overdispersion, zero inflation, and offsets in a Poisson GLM"
+name = "Summary and outlook"
+file = "ch12"
+pages = "335-336"
+
+[[topic]]
+ref = "13.1"
+unit = "Chapter 13: Poisson GLM with continuous and categorical explanatory variables"
+name = "Introduction"
+file = "ch13"
+pages = "337-338"
+
+[[topic]]
+ref = "13.2"
+unit = "Chapter 13: Poisson GLM with continuous and categorical explanatory variables"
+name = "Data generation"
+file = "ch13"
+pages = "339"
+
+[[topic]]
+ref = "13.3"
+unit = "Chapter 13: Poisson GLM with continuous and categorical explanatory variables"
+name = "Likelihood analysis with canned functions in R"
+file = "ch13"
+pages = "340"
+
+[[topic]]
+ref = "13.4"
+unit = "Chapter 13: Poisson GLM with continuous and categorical explanatory variables"
+name = "Bayesian analysis with JAGS"
+file = "ch13"
+pages = "341-344"
+
+[[topic]]
+ref = "13.5"
+unit = "Chapter 13: Poisson GLM with continuous and categorical explanatory variables"
+name = "Bayesian analysis with NIMBLE"
+file = "ch13"
+pages = "345"
+
+[[topic]]
+ref = "13.6"
+unit = "Chapter 13: Poisson GLM with continuous and categorical explanatory variables"
+name = "Bayesian analysis with Stan"
+file = "ch13"
+pages = "345"
+
+[[topic]]
+ref = "13.7"
+unit = "Chapter 13: Poisson GLM with continuous and categorical explanatory variables"
+name = "Do-it-yourself maximum likelihood estimates"
+file = "ch13"
+pages = "346"
+
+[[topic]]
+ref = "13.8"
+unit = "Chapter 13: Poisson GLM with continuous and categorical explanatory variables"
+name = "Likelihood analysis with TMB"
+file = "ch13"
+pages = "347"
+
+[[topic]]
+ref = "13.9"
+unit = "Chapter 13: Poisson GLM with continuous and categorical explanatory variables"
+name = "Comparison of the parameter estimates"
+file = "ch13"
+pages = "348"
+
+[[topic]]
+ref = "13.10"
+unit = "Chapter 13: Poisson GLM with continuous and categorical explanatory variables"
+name = "Summary"
+file = "ch13"
+pages = "348"
+
+[[topic]]
+ref = "14.1"
+unit = "Chapter 14: Poisson generalized linear mixed model, or Poisson GLMM"
+name = "Introduction"
+file = "ch14"
+pages = "349-350"
+
+[[topic]]
+ref = "14.2"
+unit = "Chapter 14: Poisson generalized linear mixed model, or Poisson GLMM"
+name = "Data generation"
+file = "ch14"
+pages = "351-352"
+
+[[topic]]
+ref = "14.3"
+unit = "Chapter 14: Poisson generalized linear mixed model, or Poisson GLMM"
+name = "Likelihood analysis with canned functions in R"
+file = "ch14"
+pages = "353"
+
+[[topic]]
+ref = "14.4"
+unit = "Chapter 14: Poisson generalized linear mixed model, or Poisson GLMM"
+name = "Bayesian analysis with JAGS"
+file = "ch14"
+pages = "354-355"
+
+[[topic]]
+ref = "14.5"
+unit = "Chapter 14: Poisson generalized linear mixed model, or Poisson GLMM"
+name = "Bayesian analysis with NIMBLE"
+file = "ch14"
+pages = "356"
+
+[[topic]]
+ref = "14.6"
+unit = "Chapter 14: Poisson generalized linear mixed model, or Poisson GLMM"
+name = "Bayesian analysis with Stan"
+file = "ch14"
+pages = "356"
+
+[[topic]]
+ref = "14.7"
+unit = "Chapter 14: Poisson generalized linear mixed model, or Poisson GLMM"
+name = "Do-it-yourself maximum likelihood estimates"
+file = "ch14"
+pages = "357-358"
+
+[[topic]]
+ref = "14.8"
+unit = "Chapter 14: Poisson generalized linear mixed model, or Poisson GLMM"
+name = "Likelihood analysis with TMB"
+file = "ch14"
+pages = "359-360"
+
+[[topic]]
+ref = "14.9"
+unit = "Chapter 14: Poisson generalized linear mixed model, or Poisson GLMM"
+name = "Comparison of the parameter estimates"
+file = "ch14"
+pages = "361"
+
+[[topic]]
+ref = "14.10"
+unit = "Chapter 14: Poisson generalized linear mixed model, or Poisson GLMM"
+name = "Summary"
+file = "ch14"
+pages = "361-362"
+
+[[topic]]
+ref = "15.1"
+unit = "Chapter 15: Comparing two groups in a logistic regression model"
+name = "Introduction"
+file = "ch15"
+pages = "363-364"
+
+[[topic]]
+ref = "15.2"
+unit = "Chapter 15: Comparing two groups in a logistic regression model"
+name = "Data generation"
+file = "ch15"
+pages = "365"
+
+[[topic]]
+ref = "15.3"
+unit = "Chapter 15: Comparing two groups in a logistic regression model"
+name = "Likelihood analysis with canned functions in R"
+file = "ch15"
+pages = "366"
+
+[[topic]]
+ref = "15.4"
+unit = "Chapter 15: Comparing two groups in a logistic regression model"
+name = "Bayesian analysis with JAGS"
+file = "ch15"
+pages = "367-368"
+
+[[topic]]
+ref = "15.5"
+unit = "Chapter 15: Comparing two groups in a logistic regression model"
+name = "Bayesian analysis with NIMBLE"
+file = "ch15"
+pages = "369"
+
+[[topic]]
+ref = "15.6"
+unit = "Chapter 15: Comparing two groups in a logistic regression model"
+name = "Bayesian analysis with Stan"
+file = "ch15"
+pages = "369"
+
+[[topic]]
+ref = "15.7"
+unit = "Chapter 15: Comparing two groups in a logistic regression model"
+name = "Do-it-yourself maximum likelihood estimates"
+file = "ch15"
+pages = "370"
+
+[[topic]]
+ref = "15.8"
+unit = "Chapter 15: Comparing two groups in a logistic regression model"
+name = "Likelihood analysis with TMB"
+file = "ch15"
+pages = "371-372"
+
+[[topic]]
+ref = "15.9"
+unit = "Chapter 15: Comparing two groups in a logistic regression model"
+name = "Comparison of the parameter estimates"
+file = "ch15"
+pages = "373"
+
+[[topic]]
+ref = "15.10"
+unit = "Chapter 15: Comparing two groups in a logistic regression model"
+name = "Summary"
+file = "ch15"
+pages = "373-374"
+
+[[topic]]
+ref = "16.1"
+unit = "Chapter 16: Binomial GLM with continuous and categorical explanatory variables"
+name = "Introduction"
+file = "ch16"
+pages = "375-376"
+
+[[topic]]
+ref = "16.2"
+unit = "Chapter 16: Binomial GLM with continuous and categorical explanatory variables"
+name = "Data generation"
+file = "ch16"
+pages = "377-378"
+
+[[topic]]
+ref = "16.3"
+unit = "Chapter 16: Binomial GLM with continuous and categorical explanatory variables"
+name = "Likelihood analysis with canned functions in R"
+file = "ch16"
+pages = "379"
+
+[[topic]]
+ref = "16.4"
+unit = "Chapter 16: Binomial GLM with continuous and categorical explanatory variables"
+name = "Bayesian analysis with JAGS"
+file = "ch16"
+pages = "379-381"
+
+[[topic]]
+ref = "16.5"
+unit = "Chapter 16: Binomial GLM with continuous and categorical explanatory variables"
+name = "Bayesian analysis with NIMBLE"
+file = "ch16"
+pages = "382"
+
+[[topic]]
+ref = "16.6"
+unit = "Chapter 16: Binomial GLM with continuous and categorical explanatory variables"
+name = "Bayesian analysis with Stan"
+file = "ch16"
+pages = "382-383"
+
+[[topic]]
+ref = "16.7"
+unit = "Chapter 16: Binomial GLM with continuous and categorical explanatory variables"
+name = "Do-it-yourself maximum likelihood estimates"
+file = "ch16"
+pages = "384"
+
+[[topic]]
+ref = "16.8"
+unit = "Chapter 16: Binomial GLM with continuous and categorical explanatory variables"
+name = "Likelihood analysis with TMB"
+file = "ch16"
+pages = "385"
+
+[[topic]]
+ref = "16.9"
+unit = "Chapter 16: Binomial GLM with continuous and categorical explanatory variables"
+name = "Comparison of the estimates"
+file = "ch16"
+pages = "386"
+
+[[topic]]
+ref = "16.10"
+unit = "Chapter 16: Binomial GLM with continuous and categorical explanatory variables"
+name = "Summary"
+file = "ch16"
+pages = "386"
+
+[[topic]]
+ref = "17.1"
+unit = "Chapter 17: Binomial generalized linear mixed model"
+name = "Introduction"
+file = "ch17"
+pages = "387"
+
+[[topic]]
+ref = "17.2"
+unit = "Chapter 17: Binomial generalized linear mixed model"
+name = "Data generation"
+file = "ch17"
+pages = "388-390"
+
+[[topic]]
+ref = "17.3"
+unit = "Chapter 17: Binomial generalized linear mixed model"
+name = "Likelihood analysis with canned functions in R"
+file = "ch17"
+pages = "391"
+
+[[topic]]
+ref = "17.4"
+unit = "Chapter 17: Binomial generalized linear mixed model"
+name = "Bayesian analysis with JAGS"
+file = "ch17"
+pages = "392-393"
+
+[[topic]]
+ref = "17.5"
+unit = "Chapter 17: Binomial generalized linear mixed model"
+name = "Bayesian analysis with NIMBLE"
+file = "ch17"
+pages = "394"
+
+[[topic]]
+ref = "17.6"
+unit = "Chapter 17: Binomial generalized linear mixed model"
+name = "Bayesian analysis with Stan"
+file = "ch17"
+pages = "394-395"
+
+[[topic]]
+ref = "17.7"
+unit = "Chapter 17: Binomial generalized linear mixed model"
+name = "Do-it-yourself maximum likelihood estimates"
+file = "ch17"
+pages = "396"
+
+[[topic]]
+ref = "17.8"
+unit = "Chapter 17: Binomial generalized linear mixed model"
+name = "Likelihood analysis with TMB"
+file = "ch17"
+pages = "397-398"
+
+[[topic]]
+ref = "17.9"
+unit = "Chapter 17: Binomial generalized linear mixed model"
+name = "Comparison of the parameter estimates"
+file = "ch17"
+pages = "399"
+
+[[topic]]
+ref = "17.10"
+unit = "Chapter 17: Binomial generalized linear mixed model"
+name = "Summary"
+file = "ch17"
+pages = "399-400"
+
+[[topic]]
+ref = "18.1"
+unit = "Chapter 18: Model building, model checking, and model selection"
+name = "Introduction"
+file = "ch18"
+pages = "401"
+
+[[topic]]
+ref = "18.2"
+unit = "Chapter 18: Model building, model checking, and model selection"
+name = "Why do we build a statistical model?"
+file = "ch18"
+pages = "402-403"
+
+[[topic]]
+ref = "18.3"
+unit = "Chapter 18: Model building, model checking, and model selection"
+name = "Ticklish rattlesnakes"
+file = "ch18"
+pages = "404-405"
+
+[[topic]]
+ref = "18.4"
+unit = "Chapter 18: Model building, model checking, and model selection"
+name = "How do we build a statistical model?"
+file = "ch18"
+pages = "406-408"
+
+[[topic]]
+ref = "18.5"
+unit = "Chapter 18: Model building, model checking, and model selection"
+name = "Model checking and goodness-of-fit testing"
+file = "ch18"
+pages = "409-428"
+
+[[topic]]
+ref = "18.6"
+unit = "Chapter 18: Model building, model checking, and model selection"
+name = "Model selection"
+file = "ch18"
+pages = "429-439"
+
+[[topic]]
+ref = "18.7"
+unit = "Chapter 18: Model building, model checking, and model selection"
+name = "Model averaging"
+file = "ch18"
+pages = "440-441"
+
+[[topic]]
+ref = "18.8"
+unit = "Chapter 18: Model building, model checking, and model selection"
+name = "Regularization: penalization, shrinkage, ridge, and lasso"
+file = "ch18"
+pages = "442-443"
+
+[[topic]]
+ref = "18.9"
+unit = "Chapter 18: Model building, model checking, and model selection"
+name = "Summary and outlook"
+file = "ch18"
+pages = "444-446"
+
+[[topic]]
+ref = "19.1"
+unit = "Chapter 19: Occupancy models"
+name = "Introduction"
+file = "ch19"
+pages = "447-451"
+
+[[topic]]
+ref = "19.2"
+unit = "Chapter 19: Occupancy models"
+name = "Data generation"
+file = "ch19"
+pages = "452-455"
+
+[[topic]]
+ref = "19.3"
+unit = "Chapter 19: Occupancy models"
+name = "Likelihood analysis with canned functions in the R package unmarked"
+file = "ch19"
+pages = "456-457"
+
+[[topic]]
+ref = "19.4"
+unit = "Chapter 19: Occupancy models"
+name = "Bayesian analysis with JAGS"
+file = "ch19"
+pages = "458-461"
+
+[[topic]]
+ref = "19.5"
+unit = "Chapter 19: Occupancy models"
+name = "Bayesian analysis with NIMBLE"
+file = "ch19"
+pages = "462"
+
+[[topic]]
+ref = "19.6"
+unit = "Chapter 19: Occupancy models"
+name = "Bayesian analysis with Stan"
+file = "ch19"
+pages = "462-464"
+
+[[topic]]
+ref = "19.7"
+unit = "Chapter 19: Occupancy models"
+name = "Bayesian analysis with canned functions in the R package ubms"
+file = "ch19"
+pages = "465"
+
+[[topic]]
+ref = "19.8"
+unit = "Chapter 19: Occupancy models"
+name = "Do-it-yourself maximum likelihood estimates"
+file = "ch19"
+pages = "466"
+
+[[topic]]
+ref = "19.9"
+unit = "Chapter 19: Occupancy models"
+name = "Likelihood analysis with TMB"
+file = "ch19"
+pages = "467-468"
+
+[[topic]]
+ref = "19.10"
+unit = "Chapter 19: Occupancy models"
+name = "Comparison of the parameter estimates"
+file = "ch19"
+pages = "469"
+
+[[topic]]
+ref = "19.11"
+unit = "Chapter 19: Occupancy models"
+name = "Summary and outlook"
+file = "ch19"
+pages = "469-472"
+
+[[topic]]
+ref = "20.1"
+unit = "Chapter 20: Integrated models"
+name = "Introduction"
+file = "ch20"
+pages = "473-478"
+
+[[topic]]
+ref = "20.2"
+unit = "Chapter 20: Integrated models"
+name = "Data generation: simulating three abundance data sets with different observation/aggregation models"
+file = "ch20"
+pages = "479-480"
+
+[[topic]]
+ref = "20.3"
+unit = "Chapter 20: Integrated models"
+name = "Fitting models to the three individual data sets first"
+file = "ch20"
+pages = "481-486"
+
+[[topic]]
+ref = "20.4"
+unit = "Chapter 20: Integrated models"
+name = "Fitting the integrated model to all three data sets simultaneously"
+file = "ch20"
+pages = "487-491"
+
+[[topic]]
+ref = "20.5"
+unit = "Chapter 20: Integrated models"
+name = "What do we gain by analyzing the joint likelihood in our analysis?"
+file = "ch20"
+pages = "492-493"
+
+[[topic]]
+ref = "20.6"
+unit = "Chapter 20: Integrated models"
+name = "Summary and outlook"
+file = "ch20"
+pages = "494-496"
+
+[[topic]]
+ref = "21.1"
+unit = "Chapter 21: Conclusion"
+name = "Looking back"
+file = "ch21"
+pages = "497-498"
+
+[[topic]]
+ref = "21.2"
+unit = "Chapter 21: Conclusion"
+name = "Looking ahead"
+file = "ch21"
+pages = "499-504"
