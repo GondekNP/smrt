@@ -16,11 +16,13 @@ SDK, so this runs in the image (`scripts/test-tools.sh`), not on a bare host.
 from __future__ import annotations
 
 import hashlib
+import tempfile
 import unittest
+from pathlib import Path
 
 from mcp.server.mcpserver.exceptions import ToolError
 
-from vault_tools import server
+from vault_tools import ledger, server
 from vault_tools.server import (
     QuizOption,
     answer_quiz,
@@ -222,19 +224,34 @@ RUBRIC = [
 ]
 
 
-class TestExplain(Base):
+class VaultBase(Base):
+    """Explain and grading now touch the concept ledger, which lives under
+    VAULT_ROOT. Point it somewhere disposable rather than at a real vault."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self._tmp = tempfile.TemporaryDirectory()
+        self._real_root = server.VAULT_ROOT
+        server.VAULT_ROOT = Path(self._tmp.name)
+
+    def tearDown(self) -> None:
+        server.VAULT_ROOT = self._real_root
+        self._tmp.cleanup()
+
+
+class TestExplain(VaultBase):
     def test_a_rubric_is_required(self) -> None:
         with self.assertRaisesRegex(ToolError, "rubric is required"):
-            explain("Why is Fisher information the negative expected Hessian?", [])
+            explain("Why is Fisher information the negative expected Hessian?", [], [])
 
     def test_duplicate_and_blank_items_are_refused(self) -> None:
         with self.assertRaisesRegex(ToolError, "duplicate rubric items"):
-            explain("q", ["same", "same"])
+            explain("q", ["same", "same"], [])
         with self.assertRaisesRegex(ToolError, "must not be blank"):
-            explain("q", ["real", "  "])
+            explain("q", ["real", "  "], [])
 
     def test_the_rubric_is_not_in_the_payload_but_its_hash_is(self) -> None:
-        posed = explain("Why the negative expected Hessian?", RUBRIC)
+        posed = explain("Why the negative expected Hessian?", RUBRIC, [])
         rendered = repr(posed)
         for item in RUBRIC:
             self.assertNotIn(item, rendered)
@@ -245,14 +262,14 @@ class TestExplain(Base):
         """A learner who cannot verify the hash themselves is taking the
         pre-commitment on faith, which defeats it. One item per line, so
         `sha256sum` reproduces this."""
-        posed = explain("q", RUBRIC)
+        posed = explain("q", RUBRIC, [])
         expected = hashlib.sha256("\n".join(RUBRIC).encode("utf-8")).hexdigest()
         self.assertEqual(posed.rubric_sha256, expected)
 
 
-class TestGradeExplain(Base):
+class TestGradeExplain(VaultBase):
     def pose(self):
-        return explain("Why the negative expected Hessian?", RUBRIC)
+        return explain("Why the negative expected Hessian?", RUBRIC, [])
 
     def test_a_complete_partition_grades(self) -> None:
         posed = self.pose()
@@ -305,6 +322,100 @@ class TestGradeExplain(Base):
         posed = self.pose()
         with self.assertRaisesRegex(ToolError, "answer is required"):
             grade_explain(posed.question_id, answer="", hit=RUBRIC, missed=[])
+
+
+class TestVocabularyGate(VaultBase):
+    """The tiered rule, end to end through the tools rather than the ledger.
+
+    The point of the gate is that it cannot be talked past: an agreeable agent
+    can waive a rule written in a prompt, and cannot waive this one.
+    """
+
+    def pose(self):
+        return explain("Why the negative expected Hessian?", RUBRIC,
+                       ["monotonicity"])
+
+    def test_posing_reports_where_a_concept_stands(self) -> None:
+        posed = self.pose()
+        self.assertEqual(len(posed.vocabulary), 1)
+        entry = posed.vocabulary[0]
+        self.assertEqual(entry["concept"], "monotonicity")
+        self.assertEqual(entry["tier"], "lenient")
+        self.assertFalse(entry["naming_required"])
+        self.assertIn("Credit a correct description", entry["advice"])
+
+    def test_unnamed_credits_accumulate_and_then_gate(self) -> None:
+        tiers = []
+        for _ in range(ledger.GATE_AT):
+            posed = self.pose()
+            tiers.append(posed.vocabulary[0]["tier"])
+            grade_explain(posed.question_id, answer="a description",
+                          hit=RUBRIC, missed=[], unnamed=["monotonicity"])
+        self.assertEqual(tiers[0], "lenient")
+        self.assertEqual(tiers[-1], "advisory")
+
+        gated = self.pose()
+        self.assertEqual(gated.vocabulary[0]["tier"], "gated")
+        self.assertTrue(gated.vocabulary[0]["naming_required"])
+        with self.assertRaisesRegex(ToolError, "cannot be waived"):
+            grade_explain(gated.question_id, answer="a description",
+                          hit=RUBRIC, missed=[], unnamed=["monotonicity"])
+
+    def test_a_refusal_leaves_the_ledger_untouched(self) -> None:
+        """So the call can simply be retried. Checked before anything is
+        recorded."""
+        for _ in range(ledger.GATE_AT):
+            posed = self.pose()
+            grade_explain(posed.question_id, answer="d", hit=RUBRIC, missed=[],
+                          unnamed=["monotonicity"])
+        before = ledger.load("monotonicity", server.VAULT_ROOT)
+        blocked = self.pose()
+        with self.assertRaises(ToolError):
+            grade_explain(blocked.question_id, answer="d", hit=RUBRIC,
+                          missed=[], unnamed=["monotonicity"])
+        after = ledger.load("monotonicity", server.VAULT_ROOT)
+        self.assertEqual(after.unnamed_streak, before.unnamed_streak)
+        self.assertEqual(after.credited_unnamed, before.credited_unnamed)
+
+    def test_naming_it_resets_the_streak(self) -> None:
+        """The rule is about failing to internalize a term continually."""
+        for _ in range(ledger.GATE_AT):
+            posed = self.pose()
+            grade_explain(posed.question_id, answer="d", hit=RUBRIC, missed=[],
+                          unnamed=["monotonicity"])
+        posed = self.pose()
+        self.assertTrue(posed.vocabulary[0]["naming_required"])
+        result = grade_explain(posed.question_id, answer="it is monotonic",
+                               hit=RUBRIC, missed=[], named=["monotonicity"])
+        self.assertEqual(result.vocabulary[0]["tier"], "lenient")
+        self.assertEqual(
+            ledger.load("monotonicity", server.VAULT_ROOT).unnamed_streak, 0)
+
+    def test_a_human_can_lift_the_gate_and_the_tool_honours_it(self) -> None:
+        for _ in range(ledger.GATE_AT):
+            posed = self.pose()
+            grade_explain(posed.question_id, answer="d", hit=RUBRIC, missed=[],
+                          unnamed=["monotonicity"])
+        path = ledger.concept_path("monotonicity", server.VAULT_ROOT)
+        path.write_text(path.read_text().replace("gate: auto", "gate: off"))
+
+        posed = self.pose()
+        self.assertFalse(posed.vocabulary[0]["naming_required"])
+        grade_explain(posed.question_id, answer="d", hit=RUBRIC, missed=[],
+                      unnamed=["monotonicity"])
+
+    def test_an_undeclared_concept_is_refused(self) -> None:
+        """Grading can only speak about concepts the question committed to."""
+        posed = self.pose()
+        with self.assertRaisesRegex(ToolError, "not declared"):
+            grade_explain(posed.question_id, answer="d", hit=RUBRIC, missed=[],
+                          named=["ergodicity"])
+
+    def test_a_concept_cannot_be_both_named_and_unnamed(self) -> None:
+        posed = self.pose()
+        with self.assertRaisesRegex(ToolError, "both named and unnamed"):
+            grade_explain(posed.question_id, answer="d", hit=RUBRIC, missed=[],
+                          named=["monotonicity"], unnamed=["monotonicity"])
 
 
 class TestSurface(unittest.TestCase):

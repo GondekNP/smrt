@@ -191,7 +191,7 @@ class TestRoundTrip(unittest.TestCase):
     def test_explain_commits_a_hash_and_grades_against_it(self) -> None:
         async def body(session, _init):
             posed = payload(await session.call_tool(
-                "explain", {"question": EXPLAIN_Q, "rubric": RUBRIC}))
+                "explain", {"question": EXPLAIN_Q, "rubric": RUBRIC, "concepts": []}))
             graded = payload(await session.call_tool("grade_explain", {
                 "question_id": posed["question_id"],
                 "answer": "curvature of the log-likelihood",
@@ -216,7 +216,7 @@ class TestRefusals(unittest.TestCase):
     def test_a_softened_rubric_is_refused_over_the_wire(self) -> None:
         async def body(session, _init):
             posed = payload(await session.call_tool(
-                "explain", {"question": "q", "rubric": RUBRIC}))
+                "explain", {"question": "q", "rubric": RUBRIC, "concepts": []}))
             return await session.call_tool("grade_explain", {
                 "question_id": posed["question_id"],
                 "answer": "hand-wavy",
@@ -258,7 +258,8 @@ class TestTheCallLog(unittest.TestCase):
 
             async def body(session, _init):
                 await session.call_tool("explain", {"question": EXPLAIN_Q,
-                                                    "rubric": RUBRIC})
+                                                    "rubric": RUBRIC,
+                                                    "concepts": []})
                 await session.call_tool("grade_explain", {
                     "question_id": "explain-nope",
                     "answer": "x", "hit": [], "missed": [],

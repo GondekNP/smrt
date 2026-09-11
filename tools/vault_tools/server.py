@@ -77,7 +77,7 @@ from typing import Literal
 from mcp.server.mcpserver import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
 
-from . import trace
+from . import ledger, trace
 
 VAULT_ROOT = Path(os.environ.get("VAULT_ROOT", "/vault"))
 SUBJECT_ROOT = Path(os.environ.get("SUBJECT_ROOT", "/subject"))
@@ -140,6 +140,7 @@ class _PosedExplain:
     question: str
     rubric: list[str]
     rubric_sha256: str
+    concepts: list[str]
     graded: bool = False
 
 
@@ -448,12 +449,14 @@ def answer_quiz(
 
 @dataclass
 class ExplainPosed:
-    """The question, and proof that the bar was set before it was asked."""
+    """The question, proof that the bar was set before it was asked, and where
+    each named concept currently stands in the vocabulary ledger."""
 
     question_id: str
     question: str
     rubric_sha256: str
     rubric_items: int
+    vocabulary: list[dict]
 
 
 @dataclass
@@ -464,14 +467,31 @@ class ExplainResult:
     rubric: list[str]
     rubric_sha256: str
     next_step: str
+    vocabulary: list[dict]
 
 
 @srv.tool()
-def explain(question: str, rubric: list[str]) -> ExplainPosed:
+def explain(
+    question: str,
+    rubric: list[str],
+    concepts: list[str],
+) -> ExplainPosed:
     """Pose a free-response question, committing the rubric first.
 
     Returns the question and the rubric's hash — never the rubric itself, so
     the payload is safe to show. Grade the answer with `grade_explain`.
+
+    `concepts` names the technical terms this question exercises, and the
+    returned `vocabulary` tells you where each one stands across **all
+    previous sessions**. Read it before writing the rubric: a concept reported
+    as `naming_required` is one where a correct description no longer earns
+    the item without the word, and `grade_explain` will refuse a verdict that
+    credits it unnamed.
+
+    Required rather than optional on purpose. An empty list is a legitimate
+    answer for a question with no vocabulary at stake — but it is then a
+    visible choice rather than an omission, which is the difference between
+    declining the ledger and quietly bypassing it.
 
     The rubric MUST be the three things a correct explanation has to contain,
     written before the question is shown. This is not ceremony: the default
@@ -492,18 +512,24 @@ def explain(question: str, rubric: list[str]) -> ExplainPosed:
     if any(not item.strip() for item in rubric):
         raise ToolError("rubric items must not be blank")
 
+    declared = [c for c in (concepts or []) if c.strip()]
+    if len(declared) != len(set(declared)):
+        raise ToolError(f"duplicate concepts: {declared}")
+
     question_id = _new_id("explain")
     digest = _rubric_sha256(rubric)
     _EXPLAINS[question_id] = _PosedExplain(
         question=question,
         rubric=list(rubric),
         rubric_sha256=digest,
+        concepts=declared,
     )
     return ExplainPosed(
         question_id=question_id,
         question=question,
         rubric_sha256=digest,
         rubric_items=len(rubric),
+        vocabulary=ledger.status(declared, VAULT_ROOT),
     )
 
 
@@ -513,6 +539,8 @@ def grade_explain(
     answer: str,
     hit: list[str],
     missed: list[str],
+    named: list[str] | None = None,
+    unnamed: list[str] | None = None,
     comment: str = "",
 ) -> ExplainResult:
     """Grade a free response against the rubric that was committed.
@@ -528,6 +556,17 @@ def grade_explain(
 
     Names what was missed rather than scoring it, because "you did not say why
     the variance term matters" is actionable and "6/10" is not.
+
+    `named` and `unnamed` split the concepts this question declared: which
+    terms the learner actually used, and which they described correctly
+    without naming. This is what the ledger counts across sessions, and it is
+    why the split is per-concept rather than a single flag.
+
+    A concept the posing call reported as `naming_required` **cannot** appear
+    in `unnamed`: that verdict is refused, and the refusal cannot be waived
+    from here. Either the learner used the term, or the rubric item it belongs
+    to is missed. Naming a concept resets its streak, because the rule is
+    about failing to internalize a term *continually*.
     """
     posed = _EXPLAINS.get(question_id)
     if posed is None:
@@ -560,7 +599,35 @@ def grade_explain(
             f"missed: {unaccounted}"
         )
 
+    told = [c for c in (named or []) if c.strip()]
+    untold = [c for c in (unnamed or []) if c.strip()]
+    stray = sorted({*told, *untold} - set(posed.concepts))
+    if stray:
+        raise ToolError(
+            f"concepts not declared when the question was posed: {stray}. "
+            f"Declared: {posed.concepts or 'none'}"
+        )
+    both = sorted(set(told) & set(untold))
+    if both:
+        raise ToolError(f"concepts in both named and unnamed: {both}")
+
+    # Checked BEFORE anything is recorded, so a refusal leaves the ledger
+    # exactly as it was and the call can simply be retried.
+    blocked = ledger.gated(untold, VAULT_ROOT)
+    if blocked:
+        raise ToolError(
+            f"naming is required for {blocked} and cannot be waived here — "
+            "the term has gone unnamed too many times in a row. Either the "
+            "learner used the word (put it in `named`), or the rubric item it "
+            "belongs to is `missed`. Only a human can lift this, by setting "
+            "`gate: off` in the concept's note."
+        )
+
     posed.graded = True
+    for name in told:
+        ledger.record_named(name, VAULT_ROOT)
+    for name in untold:
+        ledger.record_unnamed(name, VAULT_ROOT)
     missed_list = list(missed)
     return ExplainResult(
         hit=list(hit),
@@ -574,6 +641,7 @@ def grade_explain(
             else "Not yet. Teach the missed items specifically rather than "
                  "re-explaining the whole node, then re-pose a new question."
         ),
+        vocabulary=ledger.status(posed.concepts, VAULT_ROOT),
     )
 
 
