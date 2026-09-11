@@ -1,0 +1,186 @@
+# MIT 18.06SC — Linear Algebra
+#
+# THE CANON. Reviewed, cited, and never edited by an agent. See
+# docs/curriculum.md for why the node set is imported rather than generated.
+#
+# Verified against the OCW syllabus on 2026-09-11. Three "Exam N Review and
+# Exam N" entries appear in the source and are deliberately NOT included:
+# they are assessments, not topics to learn. Recorded here rather than
+# silently dropped, because "what did the import leave out" has to be
+# answerable.
+#
+# Refs are unit-relative (U1-01) rather than global lecture numbers. The
+# syllabus page restarts numbering per unit, so a global L1..L35 would be
+# inferred rather than read -- and inventing identifiers in the canon is the
+# exact failure this file exists to prevent.
+
+[course]
+id = "mit-18.06sc"
+number = "18.06SC"
+title = "Linear Algebra"
+institution = "MIT"
+url = "https://ocw.mit.edu/courses/18-06sc-linear-algebra-fall-2011/"
+verified = "2026-09-11"
+prerequisites = "18.02 Multivariable Calculus is a formal prerequisite for MIT students, but knowledge of calculus is not required to learn the subject."
+textbook = "Gilbert Strang, Introduction to Linear Algebra, 4th (2009) or 5th (2016) edition"
+excluded = "3 exam-review sessions, one per unit: assessments rather than topics"
+
+[[topic]]
+ref = "U1-01"
+unit = "Unit I: Ax = b and the Four Subspaces"
+name = "The Geometry of Linear Equations"
+
+[[topic]]
+ref = "U1-02"
+unit = "Unit I: Ax = b and the Four Subspaces"
+name = "An Overview of Key Ideas"
+
+[[topic]]
+ref = "U1-03"
+unit = "Unit I: Ax = b and the Four Subspaces"
+name = "Elimination with Matrices"
+
+[[topic]]
+ref = "U1-04"
+unit = "Unit I: Ax = b and the Four Subspaces"
+name = "Multiplication and Inverse Matrices"
+
+[[topic]]
+ref = "U1-05"
+unit = "Unit I: Ax = b and the Four Subspaces"
+name = "Factorization into A = LU"
+
+[[topic]]
+ref = "U1-06"
+unit = "Unit I: Ax = b and the Four Subspaces"
+name = "Transposes, Permutations, Vector Spaces"
+
+[[topic]]
+ref = "U1-07"
+unit = "Unit I: Ax = b and the Four Subspaces"
+name = "Column Space and Nullspace"
+
+[[topic]]
+ref = "U1-08"
+unit = "Unit I: Ax = b and the Four Subspaces"
+name = "Solving Ax = 0: Pivot Variables, Special Solutions"
+
+[[topic]]
+ref = "U1-09"
+unit = "Unit I: Ax = b and the Four Subspaces"
+name = "Solving Ax = b: Row Reduced Form R"
+
+[[topic]]
+ref = "U1-10"
+unit = "Unit I: Ax = b and the Four Subspaces"
+name = "Independence, Basis and Dimension"
+
+[[topic]]
+ref = "U1-11"
+unit = "Unit I: Ax = b and the Four Subspaces"
+name = "The Four Fundamental Subspaces"
+
+[[topic]]
+ref = "U1-12"
+unit = "Unit I: Ax = b and the Four Subspaces"
+name = "Matrix Spaces; Rank 1; Small World Graphs"
+
+[[topic]]
+ref = "U1-13"
+unit = "Unit I: Ax = b and the Four Subspaces"
+name = "Graphs, Networks, Incidence Matrices"
+
+[[topic]]
+ref = "U2-01"
+unit = "Unit II: Least Squares, Determinants and Eigenvalues"
+name = "Orthogonal Vectors and Subspaces"
+
+[[topic]]
+ref = "U2-02"
+unit = "Unit II: Least Squares, Determinants and Eigenvalues"
+name = "Projections onto Subspaces"
+
+[[topic]]
+ref = "U2-03"
+unit = "Unit II: Least Squares, Determinants and Eigenvalues"
+name = "Projection Matrices and Least Squares"
+
+[[topic]]
+ref = "U2-04"
+unit = "Unit II: Least Squares, Determinants and Eigenvalues"
+name = "Orthogonal Matrices and Gram-Schmidt"
+
+[[topic]]
+ref = "U2-05"
+unit = "Unit II: Least Squares, Determinants and Eigenvalues"
+name = "Properties of Determinants"
+
+[[topic]]
+ref = "U2-06"
+unit = "Unit II: Least Squares, Determinants and Eigenvalues"
+name = "Determinant Formulas and Cofactors"
+
+[[topic]]
+ref = "U2-07"
+unit = "Unit II: Least Squares, Determinants and Eigenvalues"
+name = "Cramer's Rule, Inverse Matrix and Volume"
+
+[[topic]]
+ref = "U2-08"
+unit = "Unit II: Least Squares, Determinants and Eigenvalues"
+name = "Eigenvalues and Eigenvectors"
+
+[[topic]]
+ref = "U2-09"
+unit = "Unit II: Least Squares, Determinants and Eigenvalues"
+name = "Diagonalization and Powers of A"
+
+[[topic]]
+ref = "U2-10"
+unit = "Unit II: Least Squares, Determinants and Eigenvalues"
+name = "Differential Equations and exp(At)"
+
+[[topic]]
+ref = "U2-11"
+unit = "Unit II: Least Squares, Determinants and Eigenvalues"
+name = "Markov Matrices; Fourier Series"
+
+[[topic]]
+ref = "U3-01"
+unit = "Unit III: Positive Definite Matrices and Applications"
+name = "Symmetric Matrices and Positive Definiteness"
+
+[[topic]]
+ref = "U3-02"
+unit = "Unit III: Positive Definite Matrices and Applications"
+name = "Complex Matrices; Fast Fourier Transform (FFT)"
+
+[[topic]]
+ref = "U3-03"
+unit = "Unit III: Positive Definite Matrices and Applications"
+name = "Positive Definite Matrices and Minima"
+
+[[topic]]
+ref = "U3-04"
+unit = "Unit III: Positive Definite Matrices and Applications"
+name = "Similar Matrices and Jordan Form"
+
+[[topic]]
+ref = "U3-05"
+unit = "Unit III: Positive Definite Matrices and Applications"
+name = "Singular Value Decomposition"
+
+[[topic]]
+ref = "U3-06"
+unit = "Unit III: Positive Definite Matrices and Applications"
+name = "Linear Transformations and their Matrices"
+
+[[topic]]
+ref = "U3-07"
+unit = "Unit III: Positive Definite Matrices and Applications"
+name = "Change of Basis; Image Compression"
+
+[[topic]]
+ref = "U3-08"
+unit = "Unit III: Positive Definite Matrices and Applications"
+name = "Left and Right Inverses; Pseudoinverse"

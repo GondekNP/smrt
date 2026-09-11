@@ -106,6 +106,16 @@ RUN bash /tmp/install-agents.sh && rm /tmp/install-agents.sh
 # SMRT_TOOLS can shadow, and editing a tool costs no rebuild.
 COPY --chown=${USER_UID}:${USER_GID} tools /workspace/tools
 
+# --- curriculum canon ------------------------------------------------------
+# The imported node set for the lesson DAG: reviewed, cited, and NOT generated.
+# See docs/curriculum.md.
+#
+# It lives here rather than in the vault on purpose. That is what makes "never
+# edited by the agent" structural rather than a promise -- the agent works in
+# /vault, and the canon is not there. Topic notes in the vault are generated
+# from it, and seeding only ever creates.
+COPY --chown=${USER_UID}:${USER_GID} curriculum /workspace/curriculum
+
 # --- ACP proxy -------------------------------------------------------------
 # Sits between Toad and the backend agent so that `mcpServers` can be injected
 # into session/new, which Toad hardcodes empty. See docs/proxy.md.
@@ -153,9 +163,12 @@ RUN PY="/home/${USERNAME}/.pixi/envs/python/bin/python3" \
         > /home/${USERNAME}/.local/bin/smrt-mcp-probe \
     && printf '#!/bin/sh\nexec env PYTHONPATH=/workspace/tools %s -m vault_tools.server "$@"\n' "$PY" \
         > /home/${USERNAME}/.local/bin/vault-tools \
+    && printf '#!/bin/sh\nexec env PYTHONPATH=/workspace/tools %s -m vault_tools.curriculum "$@"\n' "$PY" \
+        > /home/${USERNAME}/.local/bin/smrt-curriculum \
     && chmod +x /home/${USERNAME}/.local/bin/smrt-acp-proxy \
                 /home/${USERNAME}/.local/bin/smrt-mcp-probe \
-                /home/${USERNAME}/.local/bin/vault-tools
+                /home/${USERNAME}/.local/bin/vault-tools \
+                /home/${USERNAME}/.local/bin/smrt-curriculum
 
 # Toad is a Textual TUI. A capable terminal matters; the Toad README
 # specifically calls out that macOS Terminal.app gives a degraded experience.

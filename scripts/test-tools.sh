@@ -36,6 +36,7 @@ fi
 
 exec docker run --rm \
     -v "$HERE/tools:/workspace/tools:ro" \
+    -v "$HERE/curriculum:/workspace/curriculum:ro" \
     -w /workspace/tools \
     "$IMAGE" \
     python3 -m unittest discover -s tests -t . -v
