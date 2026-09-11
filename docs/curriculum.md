@@ -56,10 +56,14 @@ holds that; a sentence does.
 ```yaml
 ---
 type: curriculum-topic
-curriculum: mit-18.06          # canon: never edited
-unit: "Unit 2: Orthogonality"
-topic: Projections onto subspaces
-ocw_ref: 18.06-L15
+curriculum: mit-18.06sc        # canon: never edited
+canon_kind: course             # course | text | paper
+canon_title: "18.06SC Linear Algebra"
+canon_ref: "mit-18.06sc/U2-02"
+locator: ""                    # where in the source, when it says
+unit: "Unit II: Least Squares, Determinants and Eigenvalues"
+topic: "Projections onto Subspaces"
+source: canon                  # provenance: canon | agent
 relevance: cover               # unset | cover | skip | deferred
 relevance_decided_by: joint    # user | agent | joint
 first_taught: 2026-10-02
@@ -105,6 +109,84 @@ Non-canonical nodes remain legal and must carry `source: agent`, so the
 superset is legible as a superset. The work is expected to be a subset of the
 canon in places and a superset in others; both are fine, and only the second
 needs marking.
+
+## Three kinds of source, one import path
+
+A canon is not always a course. Added 2026-09-11, when the first real need
+arrived: a live class with a set textbook.
+
+| `kind` | Citation needs | Ordered for teaching? | Typical use |
+|---|---|---|---|
+| `course` | `number`, `url` | Yes | A syllabus |
+| `text` | `author`, `edition` | Usually | A textbook's table of contents |
+| `paper` | `author`, `url` | **No** | Something you have to present or be examined on |
+
+What they share is the only property this layer actually depends on: an
+externally authored node set with a citation and a date someone checked it.
+They differ in what citing them *requires*, which is why the required fields
+are per-kind rather than universal — asking a book for a course number means
+inventing one, and inventing identifiers in the canon is the failure this file
+exists to prevent.
+
+The table's third column is not enforced and matters more than the first two.
+A textbook's chapter order is a defensible starting DAG. **A paper's section
+order is rhetorical**, written for a reader who already knows the field, so
+using it as a lesson sequence yields a plan shaped like an argument rather than
+like a dependency graph. A paper's sections are things to be quizzed on; the
+teaching is in the background it silently assumes.
+
+The table is `[source]`, with `[course]` accepted as a synonym so the four
+existing canons keep working. Having both in one file is an error.
+
+## Grounding, and why the locator earns its keep
+
+The request that produced all this: *explain things using my class's textbook
+rather than your own examples.* It splits in two, and only one half costs
+context.
+
+| | Question | Mechanism | Cost |
+|---|---|---|---|
+| **Coverage** | What is in the text, and where am I in it | This layer | Zero at runtime |
+| **Grounding** | Whose notation and examples the explanation uses | `/subject` + retrieval | Bounded, if bounded deliberately |
+
+Grounding is not a curriculum problem and importing a table of contents does
+not solve it. But the import is what makes it **affordable**, because a topic
+can record where in the source it lives:
+
+```toml
+[[topic]]
+ref = "5.4"
+unit = "Part II: Fundamentals of Bayesian Data Analysis"
+name = "Estimating hyperparameters from the joint posterior"
+locator = "pp. 108-113"
+```
+
+Now grounding one lesson node costs six pages instead of a seven-hundred-page
+book. That is the whole argument for the field. `locator` is optional, because
+a syllabus that does not say where something lives must not be made to say.
+
+Three things follow, and they are recorded here because each is easy to get
+wrong in the pleasant direction:
+
+- **The text outranks the model on notation, naming and scope — not on the
+  explanation.** The learner is accountable to their text for the first three
+  and wants understanding for the last. When they diverge, say so and then
+  teach the text's version; a clearer treatment substituted silently leaves
+  someone fluent in a convention nobody around them uses.
+- **Reading widely is the failure mode, not the safe choice.** A 200k window
+  holds a sizable fraction of a textbook, which makes over-reading *work* —
+  right up to the session that quietly runs out of room mid-lesson.
+- **Cite, don't reproduce.** The vault records the learner's understanding. It
+  is not a place to accumulate someone's copyrighted prose.
+
+The option rejected: a one-time pass extracting the book into vault notes. It
+is generation, it is permanent, it is unreviewed, and it is the marginal-cruft
+failure above with a copyright edge.
+
+`pdftotext` is in the image for this. `/subject` is documented as possibly "a
+folder of PDFs" and `rg` cannot read one, so before 2026-09-11 a textbook could
+be mounted and never searched. `pdftotext -f 108 -l 113` also extracts *by
+page*, which is what makes a locator actionable rather than decorative.
 
 ## The mechanism: import once, seed often
 
@@ -152,7 +234,44 @@ Filenames are sanitized for the characters Obsidian forbids and iOS sync
 dislikes, and the exact title survives as an `aliases` entry — so
 `[[Solving Ax = 0: Pivot Variables, Special Solutions]]` still resolves to
 `Solving Ax = 0- Pivot Variables, Special Solutions.md`. Two titles that
-sanitize to the same filename are a **load error**, not a silent merge.
+sanitize to the same filename **within one canon** are a load error, not a
+silent merge.
+
+### Overlap between canons is real, and used to be an error
+
+Across canons the same condition has a different meaning, and the original
+rule was wrong. It refused to load two canons sharing a topic title, reasoning
+that two MIT courses covering "Bayes' Theorem" meant the import was mistaken.
+
+That does not survive a second kind of source. **A course's own textbook shares
+most of its topic titles with the course**, and so does a second course on the
+same subject — the overlap is true, and refusing it would make importing your
+own class's text impossible. The check was protecting something real, though:
+Obsidian resolves wikilinks by filename across the whole vault, so two notes
+named alike make `[[Bayes' Theorem]]` *ambiguous* rather than broken, and it
+silently resolves to whichever Obsidian picks.
+
+So overlap is now handled instead of refused. The shared ones become
+`Bayes' Theorem (18.05)` and `Bayes' Theorem (BDA3)`, and the bare link stops
+existing rather than resolving arbitrarily. A scoped note carries **no alias** —
+an alias restoring the bare title would re-create through aliases exactly the
+ambiguity the suffix removed — and says in its body why. `smrt-curriculum list`
+reports every overlap, because the overlap is a signal worth seeing: one thing
+to learn, two accounts of it, and the judgment is which account this learner
+needs.
+
+**The cost is honest and lands on existing notes.** Importing a text that
+shares a title with an already-seeded course changes the filename that course's
+topic expects. Nothing moves it: the note may carry a relevance decision, and
+this module does not move judgments. Instead `audit` reports it,
+
+```
+RENAME  Bayesian Updating- Discrete Priors.md → Bayesian Updating- Discrete Priors (18.05).md
+```
+
+and `seed` **declines to create the scoped note** while the old one is there —
+otherwise the answer to "this topic has no note" would be "this topic has two
+notes", with the judgment in the one the canon no longer names.
 
 ## The course spine
 
@@ -218,6 +337,19 @@ matrix-methods-for-data-analysis course, which may be a better companion to
 - **Refresh.** OCW versions change. A canon in git means an import is a
   reviewable diff, which is the point, but nothing currently notices upstream
   drift.
+- **Locators for courses.** Only a `text` obviously needs one, but a course
+  with assigned readings has locators too, and none of the four imported
+  canons records any. Worth adding on the next verification pass rather than
+  from memory.
+- **The schedule.** `relevance: cover` is much weaker than "covered in week 4,
+  examined on the 18th". A live class has a position in time, which is the
+  state that would make "what should I study tonight" answerable. Not built,
+  and the smallest version is probably one date field rather than a calendar.
+- **Same topic, two canons.** Overlap is scoped into separate notes, which is
+  mechanical and safe. The arguably better model is one note per concept with
+  several citations — but deciding that 18.05's "Conditional Probability,
+  Bayes' Theorem" and a textbook's "§1.3 Bayes' rule" are the same node is a
+  judgment, and judgments do not belong in the seeder.
 
 ## Sources
 

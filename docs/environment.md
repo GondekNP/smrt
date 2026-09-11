@@ -9,6 +9,12 @@ Why the image looks the way it does. Read alongside `docker/Dockerfile`.
 | `/vault` | **rw** | Obsidian vault. A git repo. Host Obsidian reads the same directory. |
 | `/subject` | **ro** | Optional. A repo, a KiCad project, a folder of PDFs, or absent. |
 
+A third case joined the list on 2026-09-11: **the set text for a course the
+learner is actually taking.** It needs no new mount and no new feature — a
+directory holding a textbook and some lecture notes is just a subject — but it
+does change what the skill should do with what it finds there. See
+`curriculum.md`, "Grounding".
+
 The read-only flag on `/subject` is the whole point. **An agent that cannot
 write cannot run ahead of you**, and that is enforced by a mount flag rather
 than by an instruction in a prompt that a model may or may not honour.
@@ -68,6 +74,13 @@ lives under `$HOME` so no sudo is needed to add agents at runtime.
 **ripgrep is load-bearing, not convenience.** The tutor agent must verify
 before asserting — reading a large codebase from memory is where confabulated
 call graphs come from. `rg` is how it checks.
+
+**poppler-utils for the same reason one step out.** `/subject` is documented
+above as possibly "a folder of PDFs", and `rg` cannot read one — so until
+2026-09-11 a textbook or paper could be mounted and never searched. `pdftotext`
+fixes that, and its `-f/-l` page range is what makes a `locator` in the
+curriculum actionable: six pages into context instead of a whole book. See
+`curriculum.md`.
 
 **Agent installs in a separate script.** `docker/install-agents.sh` sits at
 the bottom of the Dockerfile so editing it doesn't invalidate the layers

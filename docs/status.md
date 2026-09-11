@@ -31,6 +31,8 @@ not listed as verified should be assumed untested.
 | Load | 206 frames / 129 KB / 225 s in one session; largest frame 31 KB |
 | `quiz` / `explain` | implemented as pose + grade pairs; refusals verified over stdio |
 | Curriculum canon | 4 courses, 100 topics, cited and verified against ocw.mit.edu |
+| Canon kinds | a `text` canon loads, seeds and audits without a course number or URL; `pdftotext` extracts by page range in the image |
+| Overlap scoping | a text sharing a title with 18.05 seeds to `... (DEMO).md`, and the 18.05 note's judgment survives both the `RENAME` report and a re-seed |
 | Vocabulary gate | tiers progress across sessions; a gated concept's unnamed credit is refused, and the refusal leaves the ledger untouched so the call can be retried |
 | Seeding | 100 notes into a vault through the real `smrt` path; re-seed is a no-op and cannot touch a judgment |
 | **A real teaching exchange** | 2026-09-11: a model posed a quiz and an explain question through Toad, graded both, and refused to soften a rubric |
@@ -38,7 +40,7 @@ not listed as verified should be assumed untested.
 | The answer key | streams to the client in `rawInput` but Toad does not render it — the pre-commitment holds at the display layer |
 | `vault-tools` | serves MCP through the wrapper on `PATH`, spawned as a client spawns it |
 | Proxy tests | 47/47, in the image (Python 3.14) and on the host (3.10) |
-| Tool tests | 39/39, in the image (the MCP SDK is not a host dependency) |
+| Tool tests | 109/109, in the image (the MCP SDK is not a host dependency) |
 | shellcheck | zero errors across `bin/smrt`, `scripts/`, `docker/` |
 
 The read-only enforcement is the claim the project rests on, and it survived
@@ -345,6 +347,39 @@ importing another standard over generating a marginal topic. Flagged as an
 intuition rather than a measurement, with the symptoms that should trigger a
 revisit.
 
+### Extended 2026-09-11 for a live class with a set textbook
+
+Four changes, prompted by wanting `explain` to use the book the learner is
+actually graded on rather than its own examples.
+
+- **A canon is not always a course.** `kind = course | text | paper`, with
+  per-kind required citation fields — a book has an edition where a course has
+  a URL. `[source]` is the table name, `[course]` still accepted.
+- **Topics may carry a `locator`** (`pp. 108-113`). This is the piece that
+  makes grounding affordable: six pages into context per lesson node instead of
+  a seven-hundred-page book. Optional, because a syllabus that does not say
+  where something lives must not be made to say.
+- **`pdftotext` is in the image.** `/subject` was already documented as
+  possibly "a folder of PDFs" and `rg` cannot read one, so a textbook could be
+  mounted and never searched. Its `-f/-l` page range is what makes a locator
+  actionable rather than decorative.
+- **Cross-canon title overlap is handled, not refused.** This reverses a rule:
+  `load_all` used to raise on two canons sharing a topic title. A course's own
+  textbook shares most of its titles with the course, so the old rule would
+  have made the import impossible. Shared titles now get filename-scoped notes
+  (`Bayes' Theorem (18.05)`), no alias, and a line in the body saying why.
+
+The cost is honest and falls on notes that already exist: importing a text that
+overlaps a seeded course changes the filename that course's topic expects.
+Nothing is moved automatically — the note may hold a relevance judgment — so
+`audit` reports a `RENAME` and `seed` declines to create the second note while
+the first is there. Verified end to end against the real canon plus a scratch
+text canon that shares a title with 18.05.
+
+**Not done, and deliberately:** no canon for the learner's actual textbook. It
+has not been named, and typing a table of contents from memory is the 18.675
+failure with a bigger blast radius.
+
 ## Known constraints, accepted
 
 - **Docker Desktop does not work**, and SMRT refuses to start on it rather than
@@ -357,10 +392,13 @@ revisit.
 
 ## Decisions
 
-Eight, all recorded in `OPEN.md` with reasoning. Four resolved on 2026-09-08
+Ten, all recorded in `OPEN.md` with reasoning. Four resolved on 2026-09-08
 (auth, engine, MCP attachment, probe phase, derive loop), one deferred
-deliberately (vault topology), one settled earlier (tool placement), and the
-MCP SDK settled on 2026-09-10 by measuring the candidates in the image.
+deliberately (vault topology), one settled earlier (tool placement), the
+MCP SDK settled on 2026-09-10 by measuring the candidates in the image, and
+two on 2026-09-11 — the DAG's node set is imported rather than generated, and
+the learner's own course text is authoritative on notation, naming and scope
+but not on the explanation.
 
 `.devcontainer/` is deliberately untouched and lags the launcher — the real
 entry point is `bin/smrt`. Its `post-create.sh` seeds from a path not present

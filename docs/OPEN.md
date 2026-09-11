@@ -1,9 +1,10 @@
 # Open decisions
 
-Nine decisions, all resolved and recorded in place below. Decisions 4 and 5
-were found while testing the L0 scaffold rather than while designing it, and 8
-was settled by measuring the candidates in the image rather than by reading
-about them.
+Ten decisions, all resolved and recorded in place below. Decisions 4 and 5
+were found while testing the L0 scaffold rather than while designing it, 8 was
+settled by measuring the candidates in the image rather than by reading about
+them, and 9 and 10 both started as worries about trusting generated material
+too far.
 
 Resolve each by editing this file in place: strike the rejected options, keep
 the reasoning, and note the date. This file is the record of why the setup
@@ -418,6 +419,47 @@ importing another standard over generating a marginal topic. A multivariable
 calculus lesson that needs kinematics should pull in the physics curriculum
 rather than grow a hand-made node. Recorded as an intuition rather than a
 measurement, with revisit triggers, in `curriculum.md`.
+
+## 10. Grounding in the learner's own text — what defers to what
+
+**Status: decided 2026-09-11.**
+
+Raised as a practical want: a live Bayesian hierarchical modelling class with a
+set textbook, and a preference for `explain` to use *that* text rather than the
+model's own explanations or outside examples — with the context-window cost
+acknowledged up front.
+
+**Decided: the text is authoritative on notation, naming and scope. It is not
+automatically authoritative on the explanation.**
+
+The split follows from what the learner is accountable to. They are graded on
+the book's symbols, the book's names for things, and the book's idea of what is
+in scope, so a clearer account that silently renames things leaves them fluent
+in a convention nobody around them uses — discovered during an exam. They are
+*not* graded on the book's pedagogy, and a text can be terse, idiosyncratic or
+wrong. So divergence is stated once, briefly, and then the text's version is
+taught.
+
+**The mechanism is retrieval, bounded by a locator**, not a bigger context
+window. A topic imported from a text records where it lives; the lesson reads
+those pages and stops. Two things this rules out:
+
+- **Reading widely to be thorough.** A large window makes over-reading *work*,
+  right up to the session that runs out of room mid-lesson. Failing later and
+  less legibly is the worst available failure mode.
+- **Extracting the book into vault notes up front.** Generation, permanent,
+  unreviewed — the marginal-cruft failure of decision 9 with a copyright edge.
+
+One nice consequence: `rubric` is already pre-committed as `rubric_sha256`
+before the learner sees the task, so a rubric citing "§5.4, eq. 5.21" is a bar
+that is both fixed in advance **and** checkable against the book. That is
+strictly stronger than the existing pre-commitment, which only proves the bar
+did not move.
+
+Not decided, and left open in `curriculum.md`: whether a class's *position in
+time* — covered in week 4, examined on the 18th — becomes state. It would
+answer "what should I study tonight" better than any relevance enum, and it is
+also the first thing here that goes stale on its own.
 
 ## Still genuinely open
 
