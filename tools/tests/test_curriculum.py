@@ -203,21 +203,69 @@ class TestAudit(unittest.TestCase):
 
 
 class TestLoadAll(unittest.TestCase):
-    def test_the_same_title_in_two_courses_is_refused(self) -> None:
-        """Seeding puts each course in its own directory, so nothing is
-        overwritten -- but Obsidian resolves wikilinks by filename across the
-        whole vault, so a duplicate makes the link AMBIGUOUS rather than
-        broken. It silently resolves to whichever note Obsidian picks."""
+    @staticmethod
+    def _two(second: str) -> str:
+        """A second canon, distinct identity, same topic titles."""
+        return (second.replace('id = "test-101"', 'id = "test-202"')
+                      .replace('number = "TEST.101"', 'number = "TEST.202"'))
+
+    def test_the_same_title_in_two_canons_is_scoped_not_refused(self) -> None:
+        """Obsidian resolves wikilinks by filename across the whole vault, so
+        two notes named alike make the link AMBIGUOUS rather than broken --
+        it silently resolves to whichever Obsidian picks.
+
+        This was a load error until a textbook needed importing. A course's
+        text shares most of its topic titles with the course, and refusing
+        that would make the import impossible, so the shared ones get scoped
+        filenames instead."""
         with tempfile.TemporaryDirectory() as directory:
-            first = Path(directory) / "a.toml"
-            first.write_text(MINIMAL)
-            second = Path(directory) / "b.toml"
-            second.write_text(
-                MINIMAL.replace('id = "test-101"', 'id = "test-202"')
-                       .replace('number = "TEST.101"', 'number = "TEST.202"')
-            )
-            with self.assertRaisesRegex(CanonError, "ambiguous"):
+            (Path(directory) / "a.toml").write_text(MINIMAL)
+            (Path(directory) / "b.toml").write_text(self._two(MINIMAL))
+            first, second = load_all(directory)
+            self.assertEqual(first.topics[0].filename,
+                             "First Thing (TEST.101).md")
+            self.assertEqual(second.topics[0].filename,
+                             "First Thing (TEST.202).md")
+
+    def test_a_scoped_note_gets_no_alias(self) -> None:
+        """An alias restoring the bare title would re-create through aliases
+        the exact ambiguity the suffix removed."""
+        with tempfile.TemporaryDirectory() as directory:
+            (Path(directory) / "a.toml").write_text(MINIMAL)
+            (Path(directory) / "b.toml").write_text(self._two(MINIMAL))
+            canon = load_all(directory)[0]
+            scoped = canon.topics[1]          # "Second: Thing", sanitized too
+            self.assertTrue(scoped.suffix)
+            self.assertNotIn("aliases:", curriculum.note_body(canon, scoped))
+
+    def test_overlaps_are_reported_not_just_handled(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            (Path(directory) / "a.toml").write_text(MINIMAL)
+            (Path(directory) / "b.toml").write_text(self._two(MINIMAL))
+            shared = curriculum.overlaps(load_all(directory))
+            self.assertEqual(shared["First Thing"], ["TEST.101", "TEST.202"])
+
+    def test_canons_sharing_a_tag_and_a_title_are_refused(self) -> None:
+        """The suffix is only a fix if the tags differ."""
+        with tempfile.TemporaryDirectory() as directory:
+            (Path(directory) / "a.toml").write_text(MINIMAL)
+            (Path(directory) / "b.toml").write_text(
+                MINIMAL.replace('id = "test-101"', 'id = "test-202"'))
+            with self.assertRaisesRegex(CanonError, "share a tag"):
                 load_all(directory)
+
+    def test_nothing_is_scoped_when_nothing_collides(self) -> None:
+        """The suffix must not appear just because two canons are loaded --
+        it would rename every existing note in the vault."""
+        with tempfile.TemporaryDirectory() as directory:
+            (Path(directory) / "a.toml").write_text(MINIMAL)
+            (Path(directory) / "b.toml").write_text(
+                self._two(MINIMAL)
+                .replace('name = "First Thing"', 'name = "Other Thing"')
+                .replace('name = "Second: Thing"', 'name = "Another Thing"'))
+            for canon in load_all(directory):
+                for topic in canon.topics:
+                    self.assertEqual(topic.suffix, "")
 
     def test_distinct_courses_load_together(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -229,6 +277,166 @@ class TestLoadAll(unittest.TestCase):
                        .replace('name = "Second: Thing"', 'name = "Another Thing"')
             )
             self.assertEqual(len(load_all(directory)), 2)
+
+
+TEXT = """
+[source]
+kind = "text"
+id = "a-book"
+title = "A Book About Things"
+author = "Someone"
+edition = "2nd ed."
+short = "BOOK"
+verified = "2026-09-11"
+excluded = "the exercises"
+
+[[topic]]
+ref = "1.3"
+unit = "Part I: Beginnings"
+name = "The First Chapter"
+locator = "pp. 4-31"
+
+[[topic]]
+ref = "5.4"
+unit = "Part II: Later On"
+name = "A Chapter With No Pages Given"
+"""
+
+
+class TestSourceKinds(unittest.TestCase):
+    """A canon is not always a course. What citing one requires differs by
+    kind, and asking a book for a course number would mean inventing one --
+    the exact failure this layer exists to prevent."""
+
+    def test_a_text_loads_without_a_url_or_a_number(self) -> None:
+        canon = load(write(TEXT))
+        self.assertEqual(canon.kind, "text")
+        self.assertEqual(canon.url, "")
+        self.assertEqual(canon.number, "")
+        self.assertEqual(canon.tag, "BOOK")
+        self.assertEqual(canon.label, "Someone, A Book About Things (2nd ed.)")
+
+    def test_a_text_without_a_url_still_cites(self) -> None:
+        self.assertEqual(load(write(TEXT)).citation,
+                         "Someone, A Book About Things (2nd ed.)")
+
+    def test_a_course_still_needs_its_url(self) -> None:
+        with self.assertRaisesRegex(CanonError, "url"):
+            load(write(MINIMAL.replace('url = "https://example.invalid/"', "")))
+
+    def test_a_text_needs_its_edition(self) -> None:
+        """The per-kind half of the citation. A book identified only by title
+        is a book nobody can check a topic against."""
+        with self.assertRaisesRegex(CanonError, "edition"):
+            load(write(TEXT.replace('edition = "2nd ed."', "")))
+
+    def test_an_unknown_kind_is_refused(self) -> None:
+        with self.assertRaisesRegex(CanonError, "not one of"):
+            load(write(TEXT.replace('kind = "text"', 'kind = "podcast"')))
+
+    def test_course_is_still_accepted_as_the_table_name(self) -> None:
+        """The four checked-in canons use it."""
+        self.assertEqual(load(write(MINIMAL)).kind, "course")
+
+    def test_both_table_names_at_once_is_refused(self) -> None:
+        both = TEXT + MINIMAL.split("[[topic]]")[0]
+        with self.assertRaisesRegex(CanonError, "both"):
+            load(write(both))
+
+    def test_a_paper_needs_a_link(self) -> None:
+        paper = TEXT.replace('kind = "text"', 'kind = "paper"')
+        with self.assertRaisesRegex(CanonError, "url"):
+            load(write(paper))
+        linked = paper.replace('edition = "2nd ed."',
+                               'url = "https://example.invalid/p.pdf"')
+        self.assertEqual(load(write(linked)).kind, "paper")
+
+
+class TestLocator(unittest.TestCase):
+    """A locator is what makes grounding affordable: the pages for one node
+    instead of the whole book."""
+
+    def setUp(self) -> None:
+        self.canon = load(write(TEXT))
+
+    def test_a_locator_reaches_the_front_matter(self) -> None:
+        body = curriculum.note_body(self.canon, self.canon.topics[0])
+        self.assertIn('locator: "pp. 4-31"', body)
+
+    def test_a_locator_reaches_the_header_line(self) -> None:
+        body = curriculum.note_body(self.canon, self.canon.topics[0])
+        self.assertIn("*BOOK — Part I: Beginnings — pp. 4-31*", body)
+
+    def test_no_locator_emits_no_key(self) -> None:
+        """A source that does not say where a topic lives must not be made to
+        say. An empty `locator:` reads as a value."""
+        body = curriculum.note_body(self.canon, self.canon.topics[1])
+        self.assertNotIn("locator:", body)
+
+    def test_locators_are_optional_in_the_schema(self) -> None:
+        self.assertEqual(load(write(MINIMAL)).topics[0].locator, "")
+
+
+class TestRenameReporting(unittest.TestCase):
+    """A note seeded before another canon made its title ambiguous sits at
+    the unsuffixed filename. Reported, never performed -- it may carry a
+    judgment, and this module does not move those."""
+
+    def test_an_older_note_is_reported_as_a_rename_not_a_hole(self) -> None:
+        with tempfile.TemporaryDirectory() as vault:
+            alone = load(write(MINIMAL))
+            seed(alone, vault)
+            path = Path(vault) / "curriculum" / "test-101" / "First Thing.md"
+            self.assertTrue(path.exists())
+
+            with tempfile.TemporaryDirectory() as directory:
+                (Path(directory) / "a.toml").write_text(MINIMAL)
+                (Path(directory) / "b.toml").write_text(
+                    MINIMAL.replace('id = "test-101"', 'id = "test-202"')
+                           .replace('number = "TEST.101"', 'number = "TEST.202"'))
+                scoped = load_all(directory)[0]
+
+            report = audit(scoped, vault)
+            self.assertIn(("First Thing.md", "First Thing (TEST.101).md"),
+                          report.renamed)
+            self.assertNotIn("U1-01", report.holes)
+            self.assertNotIn("First Thing.md", report.orphans)
+
+    def test_seeding_declines_to_create_the_second_note(self) -> None:
+        """Seeding must not answer "this topic has no note" with "this topic
+        has two notes", leaving the judgment in the one the canon stopped
+        naming. It skips and the audit says to move it by hand."""
+        with tempfile.TemporaryDirectory() as vault:
+            seed(load(write(MINIMAL)), vault)
+            directory = Path(vault) / "curriculum" / "test-101"
+            path = directory / "First Thing.md"
+            path.write_text(path.read_text().replace("relevance: unset",
+                                                     "relevance: cover"))
+            judged = path.read_bytes()
+
+            report = seed(self._scoped(), vault)
+
+            # Both topics in this fixture share their titles with the second
+            # canon, so both are waiting.
+            self.assertEqual(report.awaiting_rename, ["U1-01", "U1-02"])
+            self.assertEqual(report.created, [])
+            self.assertEqual(path.read_bytes(), judged)
+            self.assertFalse((directory / "First Thing (TEST.101).md").exists())
+
+    @staticmethod
+    def _scoped() -> curriculum.Canon:
+        """The first canon, as it loads once a second one shares its titles."""
+        with tempfile.TemporaryDirectory() as directory:
+            (Path(directory) / "a.toml").write_text(MINIMAL)
+            (Path(directory) / "b.toml").write_text(
+                MINIMAL.replace('id = "test-101"', 'id = "test-202"')
+                       .replace('number = "TEST.101"', 'number = "TEST.202"'))
+            return load_all(directory)[0]
+
+    def test_a_scoped_note_says_why_it_is_scoped(self) -> None:
+        canon = self._scoped()
+        body = curriculum.note_body(canon, canon.topics[0])
+        self.assertIn("filename-scoped to TEST.101", body)
 
 
 class TestTheRealCanon(unittest.TestCase):
@@ -287,3 +495,24 @@ class TestTheRealCanon(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestTheCLILabelsEveryKind(unittest.TestCase):
+    """`smrt-curriculum seed` printed a bare ":" for a text canon, because it
+    labelled its output with `number` -- which a course has and a book does
+    not. Cheap bug, and the kind that only shows up the first time a second
+    kind of source exists."""
+
+    def test_seed_and_audit_label_a_canon_with_no_number(self) -> None:
+        import contextlib
+        import io
+
+        with tempfile.TemporaryDirectory() as directory:
+            (Path(directory) / "t.toml").write_text(TEXT)
+            with tempfile.TemporaryDirectory() as vault:
+                for action in ("list", "seed", "audit"):
+                    out = io.StringIO()
+                    with contextlib.redirect_stdout(out):
+                        curriculum.main([action, directory, vault])
+                    self.assertIn("BOOK", out.getvalue(), action)
+                    self.assertNotRegex(out.getvalue(), r"(?m)^: ", action)

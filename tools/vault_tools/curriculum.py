@@ -20,6 +20,19 @@ edited by the agent" structural rather than a promise: the agent works in
 /vault, and the canon is not there. Topic notes in the vault are generated
 from it.
 
+**A canon is not always a course.** Three kinds load through the same path:
+a `course` (a syllabus), a `text` (a book's table of contents) and a `paper`.
+All three are externally authored node sets with a citation, which is the only
+property this layer actually depends on. They differ in what citing them
+requires -- a book has an edition where a course has a URL -- and in how they
+should be *used*, which is the teach skill's problem rather than this module's.
+
+Topics may carry a `locator`: where in the source the topic lives (`pp.
+108-113`, `§5.4`). That field is why the import pays off twice. Coverage is the
+obvious use; the second is that a locator turns "ground this lesson in my
+textbook" from a whole-book context problem into a bounded read of the pages
+for one node.
+
 Runs on Python 3.11+ for `tomllib` -- so inside the image, like the rest of
 the tool server, not on a host interpreter.
 """
@@ -28,7 +41,9 @@ from __future__ import annotations
 
 import re
 import tomllib
-from dataclasses import dataclass, field
+from collections import Counter
+from collections.abc import Sequence
+from dataclasses import dataclass, field, replace
 from datetime import date
 from pathlib import Path
 
@@ -38,7 +53,18 @@ from pathlib import Path
 # Ax = 0: Pivot Variables, Special Solutions]]` still resolves.
 _UNSAFE = re.compile(r'[:/\\|#^\[\]?*"<>]')
 
-REQUIRED_COURSE_FIELDS = ("id", "number", "title", "url", "verified")
+# Every kind needs an identity and a date someone checked it. What counts as
+# a citation differs by kind, so the rest is per-kind: a course lives at a URL,
+# a book is identified by author and edition, a paper by author and a link.
+# Asking a book for a `number` would mean inventing one, which is the failure
+# this whole layer exists to prevent.
+REQUIRED_SOURCE_FIELDS = ("id", "title", "verified")
+REQUIRED_BY_KIND = {
+    "course": ("number", "url"),
+    "text": ("author", "edition"),
+    "paper": ("author", "url"),
+}
+KINDS = tuple(REQUIRED_BY_KIND)
 REQUIRED_TOPIC_FIELDS = ("ref", "unit", "name")
 
 
@@ -52,10 +78,19 @@ class Topic:
     ref: str
     unit: str
     name: str
+    #: Where in the source this lives: "pp. 108-113", "§5.4", "Lecture 12".
+    #: Optional, because a syllabus that does not say must not be made to.
+    locator: str = ""
+    #: Set by `load_all` when two canons share a topic title. See
+    #: `_disambiguate`; a bare suffix here keeps `filename` a pure function.
+    suffix: str = ""
 
     @property
     def filename(self) -> str:
-        return _safe_name(self.name) + ".md"
+        stem = _safe_name(self.name)
+        if self.suffix:
+            stem = f"{stem} ({_safe_name(self.suffix)})"
+        return stem + ".md"
 
 
 @dataclass(frozen=True)
@@ -66,6 +101,10 @@ class Canon:
     url: str
     verified: str
     topics: tuple[Topic, ...]
+    kind: str = "course"
+    author: str = ""
+    edition: str = ""
+    short: str = ""
     prerequisites: str = ""
     textbook: str = ""
     excluded: str = ""
@@ -77,6 +116,26 @@ class Canon:
             if topic.unit not in seen:
                 seen.append(topic.unit)
         return tuple(seen)
+
+    @property
+    def tag(self) -> str:
+        """The short handle: `18.05`, `BDA3`. Used in note headers and as the
+        disambiguating suffix, so it wants to be brief and stable."""
+        return self.short or self.number or self.course_id
+
+    @property
+    def label(self) -> str:
+        """One line naming the source, however it is identified."""
+        if self.kind == "course":
+            return f"{self.number} {self.title}".strip()
+        author = f"{self.author}, " if self.author else ""
+        edition = f" ({self.edition})" if self.edition else ""
+        return f"{author}{self.title}{edition}"
+
+    @property
+    def citation(self) -> str:
+        """Markdown. A course or paper links; a book with no URL still cites."""
+        return f"[{self.label}]({self.url})" if self.url else self.label
 
 
 def _safe_name(name: str) -> str:
@@ -96,12 +155,23 @@ def load(path: str | Path) -> Canon:
     except tomllib.TOMLDecodeError as error:
         raise CanonError(f"{path.name}: {error}") from error
 
-    course = raw.get("course")
+    # `[source]` and `[course]` are the same table under two names. A book
+    # under a heading called [course] reads as a mistake, and a heading that
+    # reads as a mistake eventually becomes one.
+    if isinstance(raw.get("source"), dict) and isinstance(raw.get("course"), dict):
+        raise CanonError(f"{path.name}: has both [source] and [course]; pick one")
+    course = raw.get("source") or raw.get("course")
     if not isinstance(course, dict):
-        raise CanonError(f"{path.name}: missing a [course] table")
-    missing = [f for f in REQUIRED_COURSE_FIELDS if not course.get(f)]
+        raise CanonError(f"{path.name}: missing a [source] table")
+
+    kind = course.get("kind", "course")
+    if kind not in REQUIRED_BY_KIND:
+        raise CanonError(f"{path.name}: kind {kind!r} is not one of {list(KINDS)}")
+
+    required = REQUIRED_SOURCE_FIELDS + REQUIRED_BY_KIND[kind]
+    missing = [f for f in required if not course.get(f)]
     if missing:
-        raise CanonError(f"{path.name}: [course] is missing {missing}")
+        raise CanonError(f"{path.name}: [{kind}] is missing {missing}")
 
     entries = raw.get("topic") or []
     if not entries:
@@ -113,7 +183,8 @@ def load(path: str | Path) -> Canon:
         if absent:
             raise CanonError(f"{path.name}: topic {index} is missing {absent}")
         topics.append(Topic(ref=entry["ref"], unit=entry["unit"],
-                            name=entry["name"]))
+                            name=entry["name"],
+                            locator=str(entry.get("locator", ""))))
 
     refs = [t.ref for t in topics]
     duplicates = sorted({r for r in refs if refs.count(r) > 1})
@@ -132,11 +203,15 @@ def load(path: str | Path) -> Canon:
 
     return Canon(
         course_id=course["id"],
-        number=course["number"],
+        number=course.get("number", ""),
         title=course["title"],
-        url=course["url"],
+        url=course.get("url", ""),
         verified=str(course["verified"]),
         topics=tuple(topics),
+        kind=kind,
+        author=course.get("author", ""),
+        edition=course.get("edition", ""),
+        short=course.get("short", ""),
         prerequisites=course.get("prerequisites", ""),
         textbook=course.get("textbook", ""),
         excluded=course.get("excluded", ""),
@@ -147,27 +222,80 @@ def load_all(directory: str | Path) -> list[Canon]:
     found = sorted(Path(directory).glob("*.toml"))
     if not found:
         raise CanonError(f"no canon files in {directory}")
-    canons = [load(path) for path in found]
+    return _disambiguate([load(path) for path in found])
 
-    # Within a canon, a filename collision is an error (see `load`). Across
-    # canons it is subtler and worth catching here: seeding puts each course in
-    # its own directory, so nothing is overwritten, but Obsidian resolves
-    # wikilinks by filename across the entire vault. A duplicate makes
-    # `[[Central Limit Theorem]]` AMBIGUOUS rather than broken, which is worse
-    # -- it silently resolves to whichever note Obsidian picks.
-    seen: dict[str, str] = {}
-    clashes: list[str] = []
+
+def overlaps(canons: Sequence[Canon]) -> dict[str, list[str]]:
+    """Topic titles that more than one canon covers, mapped to their tags.
+
+    Worth reporting rather than only handling. Overlap is the signal that two
+    sources teach the same thing, which is exactly where "cover, but reframe"
+    decisions live -- a textbook's chapter and a syllabus's lecture on the same
+    topic are one thing to learn and two accounts of it.
+    """
+    where: dict[str, list[str]] = {}
     for canon in canons:
         for topic in canon.topics:
-            other = seen.setdefault(topic.filename, canon.number)
-            if other != canon.number:
-                clashes.append(f"{topic.filename} ({other} and {canon.number})")
-    if clashes:
+            where.setdefault(topic.name, []).append(canon.tag)
+    return {name: tags for name, tags in sorted(where.items()) if len(tags) > 1}
+
+
+def _disambiguate(canons: list[Canon]) -> list[Canon]:
+    """Suffix the filename of any topic title that two canons share.
+
+    Within a canon, a filename collision is an error (see `load`): two titles
+    differing only in punctuation would seed into one note and lose one.
+
+    Across canons it is a different condition with a different remedy. Seeding
+    puts each canon in its own directory, so nothing is overwritten -- but
+    Obsidian resolves wikilinks by filename across the entire vault, so a
+    duplicate makes `[[Bayes' Theorem]]` AMBIGUOUS rather than broken, which is
+    worse: it silently resolves to whichever note Obsidian picks.
+
+    This used to be a load error, on the reasoning that two MIT courses sharing
+    a topic title meant the import was wrong. That reasoning does not survive
+    contact with a second kind of source. A textbook for a course *will* share
+    most of its topic titles with that course's syllabus, and so will a second
+    course on the same subject -- the overlap is true, not a mistake, and
+    refusing to load it would make importing your own class's text impossible.
+
+    So the shared ones become `Bayes' Theorem (18.05)` and
+    `Bayes' Theorem (BDA3)`, and the bare link stops existing rather than
+    resolving arbitrarily. `overlaps()` reports which titles this happened to.
+    """
+    counts = Counter(t.filename for canon in canons for t in canon.topics)
+    shared = {name for name, seen in counts.items() if seen > 1}
+    if not shared:
+        return canons
+
+    # The suffix is only a fix if the tags themselves are distinct.
+    tags = [c.tag for c in canons]
+    ambiguous = sorted({t for t in tags if tags.count(t) > 1})
+    if ambiguous:
         raise CanonError(
-            "topics in different courses share a filename, which makes "
-            f"wikilinks ambiguous: {sorted(clashes)}"
+            f"canons share a tag {ambiguous} and also share topic titles, so "
+            "there is no unambiguous filename to give them — set a distinct "
+            "`short` in one of them"
         )
-    return canons
+
+    resolved = [
+        replace(canon, topics=tuple(
+            replace(topic, suffix=canon.tag) if topic.filename in shared
+            else topic
+            for topic in canon.topics
+        ))
+        for canon in canons
+    ]
+
+    # Belt and braces: a topic literally titled "X (BDA3)" in one canon and
+    # "X" in a canon tagged BDA3 would collide again after suffixing. Vanishing
+    # odds, but the guarantee this function exists to provide is that no two
+    # seeded notes share a filename, so it is checked rather than assumed.
+    still = Counter(t.filename for canon in resolved for t in canon.topics)
+    left = sorted(name for name, seen in still.items() if seen > 1)
+    if left:
+        raise CanonError(f"topics still collide after disambiguating: {left}")
+    return resolved
 
 
 def note_body(canon: Canon, topic: Topic) -> str:
@@ -176,17 +304,37 @@ def note_body(canon: Canon, topic: Topic) -> str:
     `relevance: unset` is the queryable hole — a canonical topic neither party
     has judged yet. It is the default precisely so that the holes exist as
     data on day one rather than being discovered by their absence.
+
+    Note that `source:` is *provenance* — `canon` here, `agent` on a node the
+    agent added beyond any canon — while `canon_*` fields cite which canon.
+    Two different questions that look like one.
     """
     alias = ""
-    if _safe_name(topic.name) != topic.name:
+    if topic.suffix:
+        # No alias at all. The bare title is shared with another canon, and an
+        # alias restoring it would re-create through aliases exactly the
+        # ambiguity the filename suffix removed.
+        pass
+    elif _safe_name(topic.name) != topic.name:
         alias = f'aliases: ["{topic.name}"]\n'
+
+    locator = f'locator: "{topic.locator}"\n' if topic.locator else ""
+    where = " — ".join(x for x in (canon.tag, topic.unit, topic.locator) if x)
+    shared = ""
+    if topic.suffix:
+        shared = (
+            "\nAnother canon covers a topic under this same title, so this "
+            f"note is filename-scoped to {canon.tag} and carries no alias. "
+            "Link it explicitly.\n"
+        )
     return f"""---
 type: curriculum-topic
 curriculum: {canon.course_id}
-course: "{canon.number} {canon.title}"
-unit: "{topic.unit}"
+canon_kind: {canon.kind}
+canon_title: "{canon.label}"
+canon_ref: "{canon.course_id}/{topic.ref}"
+{locator}unit: "{topic.unit}"
 topic: "{topic.name}"
-ocw_ref: "{canon.course_id}/{topic.ref}"
 source: canon
 {alias}relevance: unset          # unset | cover | skip | deferred
 relevance_decided_by: ""  # user | agent | joint
@@ -197,10 +345,11 @@ outcomes: []
 
 # {topic.name}
 
-*{canon.number} — {topic.unit}*
+*{where}*
 
-Canonical topic, imported from [{canon.number}]({canon.url}). Nothing below
-this line is written by the import.
+Canonical topic, imported from {canon.citation}. Nothing below this line is
+written by the import.
+{shared}
 
 ## Relevance
 
@@ -221,10 +370,16 @@ matter to make it countable, and say why here.
 class SeedReport:
     created: list[str] = field(default_factory=list)
     existing: list[str] = field(default_factory=list)
+    #: Topics whose note exists under its older, unscoped filename. Skipped
+    #: rather than written, because writing would leave two notes for one
+    #: topic with the judgment in the one the canon no longer names.
+    awaiting_rename: list[str] = field(default_factory=list)
 
     def __str__(self) -> str:
+        waiting = (f", {len(self.awaiting_rename)} awaiting a rename"
+                   if self.awaiting_rename else "")
         return (f"{len(self.created)} created, "
-                f"{len(self.existing)} already present")
+                f"{len(self.existing)} already present" + waiting)
 
 
 def seed(canon: Canon, vault_root: str | Path) -> SeedReport:
@@ -236,6 +391,15 @@ def seed(canon: Canon, vault_root: str | Path) -> SeedReport:
         path = target / topic.filename
         if path.exists():
             report.existing.append(topic.ref)
+            continue
+        # A newly imported canon can make an existing note's title ambiguous,
+        # scoping the filename this topic now expects. The note already on
+        # disk may carry a judgment, and creating the scoped one as well would
+        # answer "one topic has no note" with "one topic has two notes" --
+        # leaving the judgment in whichever one the canon stopped naming.
+        # `audit` reports the move; seeding declines to make it worse.
+        if topic.suffix and (target / replace(topic, suffix="").filename).exists():
+            report.awaiting_rename.append(topic.ref)
             continue
         path.write_text(note_body(canon, topic), encoding="utf-8")
         report.created.append(topic.ref)
@@ -254,11 +418,18 @@ class AuditReport:
     orphans: list[str] = field(default_factory=list)
     unjudged: list[str] = field(default_factory=list)
     judged: dict[str, list[str]] = field(default_factory=dict)
+    #: (note that exists, name the canon now expects). Arises when a newly
+    #: imported canon shares a topic title, so the older note's bare filename
+    #: became ambiguous and is now scoped. Reported, never performed: the note
+    #: on the left may carry a judgment, and this module does not move those.
+    renamed: list[tuple[str, str]] = field(default_factory=list)
 
     def __str__(self) -> str:
         counts = ", ".join(f"{k}={len(v)}" for k, v in sorted(self.judged.items()))
+        renamed = f", {len(self.renamed)} to rename" if self.renamed else ""
         return (f"{len(self.holes)} holes, {len(self.orphans)} orphans, "
-                f"{len(self.unjudged)} unjudged" + (f" [{counts}]" if counts else ""))
+                f"{len(self.unjudged)} unjudged" + renamed
+                + (f" [{counts}]" if counts else ""))
 
 
 _RELEVANCE = re.compile(r"^relevance:\s*(\S+)", re.MULTILINE)
@@ -290,7 +461,24 @@ def audit(canon: Canon, vault_root: str | Path) -> AuditReport:
         if verdict == "unset":
             report.unjudged.append(topic.ref)
 
-    report.orphans = sorted(present - set(expected))
+    # A note seeded before another canon made its title ambiguous sits at the
+    # unsuffixed name. Without this it would read as a hole plus an unrelated
+    # orphan, which is the same information arranged to be confusing.
+    stray = present - set(expected)
+    for topic in canon.topics:
+        if not topic.suffix:
+            continue
+        bare = replace(topic, suffix="").filename
+        if bare in stray:
+            report.renamed.append((bare, topic.filename))
+            stray.discard(bare)
+            # Not also a hole. Seeding would answer a hole by writing a second
+            # note, leaving two notes for one topic and the judgment in the
+            # one the canon no longer names.
+            if topic.ref in report.holes:
+                report.holes.remove(topic.ref)
+
+    report.orphans = sorted(stray)
     return report
 
 
@@ -311,30 +499,46 @@ def main(argv: list[str] | None = None) -> int:
 
     if action == "list":
         for canon in canons:
-            print(f"{canon.number:<10} {canon.title}")
+            print(f"{canon.tag:<10} {canon.label}  [{canon.kind}]")
             units = len(canon.units)
+            located = sum(1 for t in canon.topics if t.locator)
             print(f"  {len(canon.topics)} topics, {units} "
                   f"{'unit' if units == 1 else 'units'}, "
                   f"verified {canon.verified}")
+            if located:
+                print(f"  {located}/{len(canon.topics)} topics carry a locator")
             if canon.excluded:
                 print(f"  excluded: {canon.excluded}")
+        shared = overlaps(canons)
+        if shared:
+            print(f"\n{len(shared)} topic titles appear in more than one canon; "
+                  "their notes are filename-scoped:")
+            for name, tags in shared.items():
+                print(f"  {name} — {', '.join(tags)}")
         return 0
 
     if action == "seed":
         for canon in canons:
-            print(f"{canon.number}: {seed(canon, vault)}")
+            report = seed(canon, vault)
+            print(f"{canon.tag}: {report}")
+            for ref in report.awaiting_rename:
+                print(f"  SKIPPED {ref} — an existing note holds this topic "
+                      "under an unscoped filename; `audit` names the move")
         return 0
 
     if action == "audit":
         worst = 0
         for canon in canons:
             report = audit(canon, vault)
-            print(f"{canon.number}: {report}")
+            print(f"{canon.tag}: {report}")
             for ref in report.holes:
                 print(f"  HOLE    {ref} — no note; run seed")
             for name in report.orphans:
                 print(f"  ORPHAN  {name} — not in the canon")
-            if report.holes or report.orphans:
+            for old, new in report.renamed:
+                print(f"  RENAME  {old} → {new} — another canon now shares "
+                      "this title; move it by hand to keep its judgment")
+            if report.holes or report.orphans or report.renamed:
                 worst = 1
         return worst
 
