@@ -217,6 +217,47 @@ Now grounding one lesson node costs six pages instead of a seven-hundred-page
 book. That is the whole argument for the field. `locator` is optional, because
 a syllabus that does not say where something lives must not be made to say.
 
+### The page numbers do not line up, and that is the trap
+
+A PDF's page 1 is almost never the book's page 1, and **a book split into
+per-chapter PDFs has a different offset in every file.** Extracting the wrong
+pages reports nothing — the text simply arrives and is about something else —
+so this is the worst available way for grounding to fail.
+
+So the canon declares its files, and the arithmetic is done in code:
+
+```toml
+root = "Hierarchical Bayes/Chapters"
+
+[[file]]
+id = "ch2"
+path = "Chapter-2---Introduction-to-statistical-inference-...pdf"
+page_offset = -14        # pdf page 1 is printed page 15
+
+[[topic]]
+ref = "2.5"
+unit = "Chapter 2: Introduction to statistical inference"
+name = "Classical inference by maximum likelihood..."
+file = "ch2"
+pages = "31-44"          # printed pages, as the book and the syllabus say
+```
+
+```
+$ smrt-curriculum locate ASM/2.5
+ASM 2.5  Classical inference by maximum likelihood and its application...
+  printed pp. 31-44  ->  pdf pp. 17-30
+  pdftotext -f 17 -l 30 "$SUBJECT_ROOT/Hierarchical Bayes/Chapters/Chapter-2...pdf" -
+```
+
+**`locate` exists so that no model ever does that subtraction.** A wrong sum
+in someone's head produces confidently wrong pages and no error, which is
+exactly the failure this design spends most of its effort on elsewhere.
+
+`pages` is structured and narrow — `"31"` or `"31-45"` — while `locator` stays
+free text for citation. A dangling `file` reference is a load error rather than
+a silent "no locator", because a locator that quietly stops working is worse
+than one that never existed.
+
 Three things follow, and they are recorded here because each is easy to get
 wrong in the pleasant direction:
 
@@ -285,15 +326,32 @@ smrt -- smrt-curriculum audit
 Filenames are sanitized for the characters Obsidian forbids and iOS sync
 dislikes, and the exact title survives as an `aliases` entry — so
 `[[Solving Ax = 0: Pivot Variables, Special Solutions]]` still resolves to
-`Solving Ax = 0- Pivot Variables, Special Solutions.md`. Two titles that
-sanitize to the same filename **within one canon** are a load error, not a
-silent merge.
+`Solving Ax = 0- Pivot Variables, Special Solutions.md`.
+
+### Titles repeat, in two different ways, and neither is an error
+
+A repeated title used to be a load error in both cases. Importing one real
+textbook killed both rules on the same afternoon.
+
+**Inside one canon.** ASM has a section called "Introduction" in sixteen of its
+twenty-one chapters, plus "Data generation", "Summary and outlook" and eight
+more. That is how books are written. Refs are unique, so a repeated title is
+qualified by ref — `Introduction (2.1).md` — and the old error survives only as
+an assertion that qualifying actually resolved it.
+
+This also covers the case the check was originally written for: `A/B` and `A-B`
+sanitize alike. Those are still suspicious, but the *harm* was a silent merge,
+and qualifying prevents the merge either way.
+
+**Across canons**, the qualifier is the canon's tag instead. The two compose —
+`Introduction (2.1 · ASM).md` — which they have to, since a title can be
+repeated inside a book *and* shared with another source.
 
 ### Overlap between canons is real, and used to be an error
 
-Across canons the same condition has a different meaning, and the original
-rule was wrong. It refused to load two canons sharing a topic title, reasoning
-that two MIT courses covering "Bayes' Theorem" meant the import was mistaken.
+The cross-canon rule was wrong for a different reason. It refused to load two
+canons sharing a topic title, reasoning that two MIT courses covering
+"Bayes' Theorem" meant the import was mistaken.
 
 That does not survive a second kind of source. **A course's own textbook shares
 most of its topic titles with the course**, and so does a second course on the
@@ -352,12 +410,37 @@ Ordered by role in reaching Bayesian modelling.
 in total, seeding cleanly into a vault. 18.02 as the prerequisite check and
 18.S096 as the reframing companion to 18.06 are not yet imported.
 
-| Canon | Topics | Units | Excluded |
-|---|---|---|---|
-| 18.05 | 24 | 4 | 2 exams, a review session, an R quiz |
-| 18.06SC | 32 | 3 | 3 exam-review sessions |
-| 18.655 | 21 | 1 | none |
-| 6.438 | 23 | 1 | none |
+### The first `text` canon: the set book for a live class
+
+Kéry & Kellner, *Applied Statistical Modelling for Ecologists* (2024) — the
+text for ESPM 215. **177 topics at x.y section granularity, 21 chapter PDFs,
+every topic resolving to a page range.**
+
+Imported from **the book's own Contents PDF**, which is the strongest
+verification available anywhere in this layer: the citation and the source are
+the same file, so nothing is recalled and the page numbers are the book's. The
+OCW canons are cited to a web page that could change under them; this one
+cannot drift from its source without the source itself changing.
+
+Three things it forced, all of them general rather than specific to this book:
+
+- **Per-file page offsets**, because the book arrives as one PDF per chapter.
+  All 21 were verified against the PDFs rather than only computed — each
+  chapter PDF's page 2 carries a printed page number, and it matches.
+- **Repeated section titles**, sixteen "Introduction"s among them, which
+  retired the within-canon collision error.
+- **x.y.z subsections are deliberately not topics.** Roughly 500 nodes would
+  multiply notes without improving the audit, and the course plan assigns work
+  by section. Section page ranges run to the page before the next section, so
+  a subsection is always inside its parent's range.
+
+| Canon | Kind | Topics | Units | Excluded |
+|---|---|---|---|---|
+| 18.05 | course | 24 | 4 | 2 exams, a review session, an R quiz |
+| 18.06SC | course | 32 | 3 | 3 exam-review sessions |
+| 18.655 | course | 21 | 1 | none |
+| 6.438 | course | 23 | 1 | none |
+| ASM | **text** | 177 | 21 | front and back matter, x.y.z subsections |
 
 Three things the imports forced, all recorded in the canon files themselves
 rather than fixed quietly:

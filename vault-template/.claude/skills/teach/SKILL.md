@@ -169,13 +169,29 @@ nobody around them uses, and they find out during an exam.
 
 ### Read by locator, not by search
 
-A canonical topic imported from a text carries a `locator` in its front
-matter — `pp. 108-113`, `§5.4`. **Read those pages and stop.** The whole point
-of importing the table of contents is that grounding one node costs a section
+A canonical topic imported from a text records **which file** and **which
+printed pages** hold it. **Read those pages and stop.** The whole point of
+importing the table of contents is that grounding one node costs a section
 rather than a book.
 
+**Never convert printed pages to PDF pages yourself.** A book's page 108 is
+not its PDF's page 108, and a book split into per-chapter files has a
+different offset in each one. Ask:
+
 ```bash
-pdftotext -f 108 -l 113 /subject/book.pdf -     # a page range, to stdout
+smrt-curriculum locate ASM/2.5     # prints the exact pdftotext command
+```
+
+It resolves the file, applies that file's offset, and hands you a command to
+run. Getting the sum wrong produces plausible text about the wrong subject and
+no error at all, which is the one failure here you cannot detect by reading the
+output — so the arithmetic is not yours to do.
+
+If a topic has no locator recorded, `locate` says so and does not guess. Then
+search, read the narrowest thing that answers the question, and say that the
+canon does not place this topic.
+
+```bash
 pdftotext /subject/book.pdf - | rg -n 'shrinkage'   # only when nothing points
 ```
 

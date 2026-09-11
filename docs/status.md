@@ -32,6 +32,10 @@ not listed as verified should be assumed untested.
 | `quiz` / `explain` | implemented as pose + grade pairs; refusals verified over stdio |
 | Curriculum canon | 4 courses, 100 topics, cited and verified against ocw.mit.edu |
 | Canon kinds | a `text` canon loads, seeds and audits without a course number or URL; `pdftotext` extracts by page range in the image |
+| The first real text canon | Kéry & Kellner ASM (2024): 177 topics, 21 chapter PDFs, imported from the book's own Contents PDF |
+| Page offsets | all 21 verified against the PDFs, not just computed — each chapter's pdf page 2 header matches its declared offset |
+| `locate` end to end | `locate ASM/2.5` printed `pdf pp. 17-30`; running exactly that command returned text beginning "2.5 Classical inference by maximum likelihood" on printed page 31 |
+| Seeding, at scale | 277 topics across 5 canons into a vault, 0 holes and 0 orphans |
 | Overlap scoping | a text sharing a title with 18.05 seeds to `... (DEMO).md`, and the 18.05 note's judgment survives both the `RENAME` report and a re-seed |
 | Vocabulary gate | tiers progress across sessions; a gated concept's unnamed credit is refused, and the refusal leaves the ledger untouched so the call can be retried |
 | Seeding | 100 notes into a vault through the real `smrt` path; re-seed is a no-op and cannot touch a judgment |
@@ -40,7 +44,7 @@ not listed as verified should be assumed untested.
 | The answer key | streams to the client in `rawInput` but Toad does not render it — the pre-commitment holds at the display layer |
 | `vault-tools` | serves MCP through the wrapper on `PATH`, spawned as a client spawns it |
 | Proxy tests | 47/47, in the image (Python 3.14) and on the host (3.10) |
-| Tool tests | 109/109, in the image (the MCP SDK is not a host dependency) |
+| Tool tests | 129/129, in the image (the MCP SDK is not a host dependency) |
 | shellcheck | zero errors across `bin/smrt`, `scripts/`, `docker/` |
 
 The read-only enforcement is the claim the project rests on, and it survived
@@ -376,9 +380,31 @@ Nothing is moved automatically — the note may hold a relevance judgment — so
 the first is there. Verified end to end against the real canon plus a scratch
 text canon that shares a title with 18.05.
 
-**Not done, and deliberately:** no canon for the learner's actual textbook. It
-has not been named, and typing a table of contents from memory is the 18.675
-failure with a bigger blast radius.
+### The set text arrived, and two rules died
+
+The learner's real class material turned out to be
+`GoogleDrive/Berkeley/Classes`, already one directory per class: ESPM 215 with
+Kéry & Kellner's ASM as 21 chapter PDFs plus the book's own R scripts, and a
+linear algebra class using Lay 5e. Nothing had to be copied anywhere.
+
+Importing one real book retired two checks written days earlier, both of which
+had looked obviously correct:
+
+- **Per-file page offsets are mandatory, not a refinement.** A PDF's page 1 is
+  not the book's page 1, and per-chapter files each differ. `[[file]]` entries
+  carry `path` and `page_offset`, and `smrt-curriculum locate` does the
+  arithmetic so that no model does. This is the one failure in the grounding
+  path that cannot be caught by reading the output.
+- **Repeated titles are normal.** ASM names a section "Introduction" in sixteen
+  chapters. The within-canon collision error would have refused the import, so
+  titles are now qualified by ref, and the cross-canon rule stacks its own
+  qualifier on top.
+
+**Still not done, and deliberately:** the Strang textbook is not in the repo and
+will not be — it is a commercial book and sourcing a copy is not something to
+do here. Nothing is blocked by that: 18.06SC's canon supplies the node set
+already, and Lay is the book the learner actually owns, so locators for linear
+algebra belong in a Lay canon rather than a Strang one. Not yet imported.
 
 ## Known constraints, accepted
 
