@@ -37,6 +37,7 @@ docker run --rm "$IMAGE" bash -c '
 # adapter Toad cannot reach Claude Code at all.
 for c in toad claude claude-agent-acp opencode \
          smrt-acp-proxy smrt-mcp-probe vault-tools \
+         smrt-curriculum smrt-ledger \
          pixi git rg python3; do
     if command -v "$c" >/dev/null 2>&1; then
         printf "  %-17s %s\n" "$c" "$(command -v "$c")"
@@ -63,6 +64,14 @@ print(\"  %-17s %d registered: %s\" % (\"vault_tools\", len(s.IMPLEMENTED),
 print(\"  %-17s %d placeholder: %s\" % (\"\", len(s.PLACEHOLDERS),
                                        \", \".join(s.PLACEHOLDERS)))
 " || printf "  %-17s BROKEN\n" "vault_tools"
+# The canon is baked in, so a malformed one should fail here rather than in a
+# lesson. load_all also refuses two courses that share a topic filename.
+python3 -c "
+from vault_tools.curriculum import load_all
+canons = load_all(\"/workspace/curriculum\")
+print(\"  %-17s %d courses, %d topics\" % (\"curriculum\", len(canons),
+                                          sum(len(c.topics) for c in canons)))
+" || printf "  %-17s BROKEN\n" "curriculum"
 '
 
 echo

@@ -31,6 +31,7 @@ not listed as verified should be assumed untested.
 | Load | 206 frames / 129 KB / 225 s in one session; largest frame 31 KB |
 | `quiz` / `explain` | implemented as pose + grade pairs; refusals verified over stdio |
 | Curriculum canon | 4 courses, 100 topics, cited and verified against ocw.mit.edu |
+| Vocabulary gate | tiers progress across sessions; a gated concept's unnamed credit is refused, and the refusal leaves the ledger untouched so the call can be retried |
 | Seeding | 100 notes into a vault through the real `smrt` path; re-seed is a no-op and cannot touch a judgment |
 | **A real teaching exchange** | 2026-09-11: a model posed a quiz and an explain question through Toad, graded both, and refused to soften a rubric |
 | Tool namespacing | reaches the model as `mcp__vault-tools__quiz`; the hyphen survives |
@@ -163,7 +164,9 @@ point is still not started.
    *what there is to demonstrate* (the curriculum layer — **done**: canon,
    seeding and audit across 18.06SC, 18.05, 18.655 and 6.438, 100 topics) and
    *what you have demonstrated* (the concept ledger, with the tiered
-   vocabulary rule — next).
+   vocabulary rule — **done**: lenient below 2 unnamed credits in a row,
+   advisory to 3, refused at 4, naming resets the streak, and only a human
+   can set `gate: off`).
 5. **Rewrite the `teach` skill** for how you actually learn. Do not ship the
    source calibration.
 6. **Then, and only then**, judge whether the four question types are right.

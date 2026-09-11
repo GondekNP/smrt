@@ -9,6 +9,8 @@ at `/vault` read-write; Obsidian reads the same files from outside.
 
 ```
 .claude/skills/  agent skills. teach/ is the one that matters.
+concepts/        the vocabulary ledger. one note per concept, counters
+                 written by the tools. `gate: off` is yours.
 curriculum/      GENERATED. one note per canonical topic, seeded from the
                  canon in the repo. Your relevance judgments live here.
 notes/           subject matter. one directory per subject. Yours.
@@ -24,6 +26,7 @@ See `docs/curriculum.md`.
 ```bash
 smrt -- smrt-curriculum seed     # create missing topic notes
 smrt -- smrt-curriculum audit    # holes, orphans, and what is still unjudged
+smrt -- smrt-ledger list         # which terms you keep not naming
 ```
 
 **`.claude/skills/` is not a style choice, it is the only path that works.**

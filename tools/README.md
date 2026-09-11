@@ -84,6 +84,45 @@ the mean distractor, asymmetric bolding — and returns them as `warnings`.
 Warnings rather than refusals: a false positive must never cost a lesson, and
 the documented fix is "regenerate, don't patch", which is the agent's call.
 
+## The concept ledger
+
+The other half of the vault's memory. `curriculum.py` holds what there is to
+demonstrate; `ledger.py` holds what you have, across sessions — because a
+single session cannot answer the question that matters: *do they know this, or
+have they now described it correctly three times running without ever using
+the word for it?*
+
+`explain` takes `concepts` and returns where each stands. `grade_explain` takes
+`named` and `unnamed`, and the ledger counts the **streak** of unnamed credits
+— naming a term resets it, because the rule is about failing to internalize
+*continually*.
+
+| Streak | Tier | Behaviour |
+|---|---|---|
+| below 2 | `lenient` | credit it, nothing said |
+| 2-3 | `advisory` | credit it, and the agent is told to supply the term and to say it will be expected. It may not waive anything silently |
+| 4+ | `gated` | naming required. Crediting it unnamed is **refused** |
+
+```bash
+smrt -- smrt-ledger list
+```
+
+Thresholds are `LENIENT_UNTIL` and `GATE_AT` in `ledger.py`, overridable by
+environment, and expected to be tuned once there are real numbers.
+
+**What this enforces, and what it does not.** The refusal is real: an
+agreeable agent can talk its way past a rule written in a prompt and cannot
+talk its way past this one. But the agent can write to `/vault`, so it could
+in principle set `gate: off` itself. What stops that being silent is that the
+vault is a git repository — the edit is a tracked change to a file the agent
+has no business touching. The mount is the boundary; the gate is discipline
+with an audit trail.
+
+`concepts` is a **required** argument on `explain`. An empty list is a fine
+answer for a question with no vocabulary at stake, but it is then a visible
+choice rather than an omission — the difference between declining the ledger
+and quietly bypassing it.
+
 ## The call log
 
 A tool server is spawned by the agent, several processes down, and its stdout

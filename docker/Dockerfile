@@ -165,10 +165,13 @@ RUN PY="/home/${USERNAME}/.pixi/envs/python/bin/python3" \
         > /home/${USERNAME}/.local/bin/vault-tools \
     && printf '#!/bin/sh\nexec env PYTHONPATH=/workspace/tools %s -m vault_tools.curriculum "$@"\n' "$PY" \
         > /home/${USERNAME}/.local/bin/smrt-curriculum \
+    && printf '#!/bin/sh\nexec env PYTHONPATH=/workspace/tools %s -m vault_tools.ledger "$@"\n' "$PY" \
+        > /home/${USERNAME}/.local/bin/smrt-ledger \
     && chmod +x /home/${USERNAME}/.local/bin/smrt-acp-proxy \
                 /home/${USERNAME}/.local/bin/smrt-mcp-probe \
                 /home/${USERNAME}/.local/bin/vault-tools \
-                /home/${USERNAME}/.local/bin/smrt-curriculum
+                /home/${USERNAME}/.local/bin/smrt-curriculum \
+                /home/${USERNAME}/.local/bin/smrt-ledger
 
 # Toad is a Textual TUI. A capable terminal matters; the Toad README
 # specifically calls out that macOS Terminal.app gives a degraded experience.
