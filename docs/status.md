@@ -253,7 +253,27 @@ client saw `Connection closed` and nothing more. Each wrapper in
 through today, which is why `smrt-mcp-probe` worked live, but depending on that
 is depending on someone else's allowlist.
 
-The regression test for the second one is worth a note, because its first
+**And the environment problem had a second half, found only under Toad.** The
+wrapper still said `python3`, and this image has three of them: the pixi
+`python` environment (the only one carrying the MCP SDK), Toad's own
+interpreter, and Debian's. Which one a client's PATH resolves is a coin flip --
+so the tool server worked from a scripted ACP client and died under Toad with
+`ModuleNotFoundError: No module named 'mcp'`, while the model reported only
+that the server "failed to connect (connection closed)". The proxy and the
+probe are stdlib-only, so they had been winning the same coin flip unnoticed;
+this surfaced with the first component that had a dependency. The wrappers now
+name an absolute interpreter, and the build fails if it cannot import `mcp`,
+because the runtime symptom is this uninformative.
+
+Diagnosing it needed `proxy/tests/spawn_session.py`, which is worth knowing
+about: MCP servers are spawned during `session/new`, before any prompt, so
+"did the injected server start, and if not why" is answerable **for free**. It
+prints the proxy's notes, the agent's stderr, Claude Code's own MCP log, and
+the tool server's log. The authoritative reason was in Claude Code's log inside
+the container, which dies with it -- so a live TUI session is the one place you
+cannot read it.
+
+The regression test for the first one is worth a note, because its first
 version passed against the broken wrapper: `python3 -m` puts the working
 directory on `sys.path`, and the suite runs from the tools directory. A real
 server is spawned with the *session's* cwd, so the test has to pass `cwd="/"`

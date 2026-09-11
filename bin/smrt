@@ -261,7 +261,14 @@ done
 
 [ ${#CMD[@]} -eq 0 ] && CMD=(toad /vault)
 
-exec docker run --rm -it \
+# A TTY only when there is one to attach. Toad is a TUI and wants -it, but a
+# scripted run -- the proxy's live diagnostics, and eventually CI -- pipes
+# stdin, and `-t` then fails outright with "cannot attach stdin to a
+# TTY-enabled container".
+TTY=(-i)
+[ -t 0 ] && [ -t 1 ] && TTY=(-i -t)
+
+exec docker run --rm "${TTY[@]}" \
     --name "smrt-$$" \
     "${MOUNTS[@]}" \
     "${ENVS[@]}" \
