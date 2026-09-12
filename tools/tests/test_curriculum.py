@@ -708,3 +708,70 @@ class TestTheASMCanon(unittest.TestCase):
                 self.assertTrue(
                     topic.unit.startswith(f"Chapter {topic.ref.split('.')[0]}:"),
                     topic.unit)
+
+
+class TestLocateAndFigure(unittest.TestCase):
+    """Both exist so that no model converts printed pages to PDF pages. A
+    wrong sum returns plausible text about the wrong subject, or a picture of
+    the wrong page, and reports nothing either way."""
+
+    def run_cli(self, *args: str) -> tuple[int, str]:
+        import contextlib
+        import io
+
+        with tempfile.TemporaryDirectory() as directory:
+            (Path(directory) / "b.toml").write_text(BOOK)
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out), contextlib.redirect_stderr(out):
+                code = curriculum.main([*args, directory, "/tmp"])
+            return code, out.getvalue()
+
+    def test_locate_applies_the_offset(self) -> None:
+        code, out = self.run_cli("locate", "SPLIT/2.1")
+        self.assertEqual(code, 0)
+        self.assertIn("printed pp. 31-44  ->  pdf pp. 17-30", out)
+        self.assertIn("pdftotext -f 17 -l 30", out)
+
+    def test_figure_applies_the_offset_to_one_page(self) -> None:
+        code, out = self.run_cli("figure", "SPLIT/2.1", "33")
+        self.assertEqual(code, 0)
+        self.assertIn("printed p. 33 -> pdf p. 19", out)
+        self.assertIn("-f 19 -l 19", out)
+
+    def test_figure_uses_singlefile_so_the_embed_name_is_knowable(self) -> None:
+        """Without it pdftoppm pads the page suffix to the width of the
+        document's last page, so the same command yields "-19" in a 62-page
+        chapter and "-019" in a 579-page book."""
+        _, out = self.run_cli("figure", "SPLIT/2.1", "33")
+        self.assertIn("-singlefile", out)
+        self.assertIn("![[split-book-p33.png]]", out)
+
+    def test_a_page_outside_the_topic_warns_but_still_works(self) -> None:
+        """A figure often sits a page outside the section that discusses it."""
+        code, out = self.run_cli("figure", "SPLIT/2.1", "50")
+        self.assertEqual(code, 0)
+        self.assertIn("outside", out)
+        self.assertIn("-f 36 -l 36", out)
+
+    def test_an_unknown_ref_fails_rather_than_guessing(self) -> None:
+        code, out = self.run_cli("locate", "SPLIT/9.9")
+        self.assertEqual(code, 1)
+        self.assertIn("no topic", out)
+
+    def test_a_topic_with_no_pages_says_so(self) -> None:
+        code, out = self.run_cli("locate", "TEST.101/U1-01")
+        self.assertEqual(code, 1)
+
+    def test_figure_needs_a_page_number(self) -> None:
+        """Called without the trailing directories, because `figure` takes its
+        page positionally and a temp dir in that slot is not a page."""
+        import contextlib
+        import io
+
+        if not REPO_CANON.is_dir():
+            self.skipTest(f"{REPO_CANON} not mounted")
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(out):
+            code = curriculum.main(["figure", "ASM/2.5"])
+        self.assertEqual(code, 2)
+        self.assertIn("usage", out.getvalue())

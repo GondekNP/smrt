@@ -245,6 +245,24 @@ recording what you found as a locator suggestion for a human to check.
 exact wording matters. The vault is a record of the learner's understanding,
 not a copy of somebody's book.
 
+### Showing a figure
+
+When the source has a figure the lesson turns on — a likelihood curve, a plate
+diagram — show it rather than describing it:
+
+```bash
+smrt-curriculum figure ASM/2.5 33    # prints the pdftoppm command and the embed
+```
+
+Same rule as `locate`: it resolves the page, so you never convert printed to
+PDF pages yourself. The image lands in `attachments/` and embeds as
+`![[kery-asm-p33.png]]`, which renders in the markdown log.
+
+**A figure or a page, not a chapter.** Rendering the book into the vault page
+by page is reproducing it, and the vault is a git repo that may get a remote.
+If you find yourself rendering a third consecutive page, read it with
+`pdftotext` and describe it instead.
+
 ### A text is not automatically a curriculum
 
 A textbook is ordered for teaching, so its chapter order is a reasonable

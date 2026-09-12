@@ -634,7 +634,10 @@ def main(argv: list[str] | None = None) -> int:
 
     args = list(sys.argv[1:] if argv is None else argv)
     action = args.pop(0) if args else "list"
-    spec = args.pop(0) if action == "locate" and args else ""
+    spec = args.pop(0) if action in ("locate", "figure") and args else ""
+    # `figure` takes its page here, before the optional canon dir and vault,
+    # or the page number is swallowed as a directory.
+    page = args.pop(0) if action == "figure" and args else ""
     canon_dir = args.pop(0) if args else "/workspace/curriculum"
     vault = args.pop(0) if args else "/vault"
 
@@ -702,6 +705,51 @@ def main(argv: list[str] | None = None) -> int:
         path, first, last = placed
         print(f"  printed pp. {topic.pages}  ->  pdf pp. {first}-{last}")
         print(f'  pdftotext -f {first} -l {last} "$SUBJECT_ROOT/{path}" -')
+        return 0
+
+    if action == "figure":
+        # `smrt-curriculum figure ASM/2.5 33` -> the pdftoppm command that
+        # renders printed page 33 as an image, for embedding in a note. Same
+        # reason `locate` exists: the printed-to-pdf offset is not arithmetic
+        # to do in your head, and a figure of the wrong page is a lesson about
+        # the wrong thing.
+        tag, _, ref = spec.rpartition("/")
+        if not tag or not ref or not page.isdigit():
+            print("usage: figure <canon>/<ref> <printed page>",
+                  file=sys.stderr)
+            return 2
+        found = [c for c in canons if tag in (c.tag, c.course_id, c.number)]
+        if not found:
+            print(f"no canon matching {tag!r}; try `list`", file=sys.stderr)
+            return 1
+        canon = found[0]
+        topic = next((t for t in canon.topics if t.ref == ref), None)
+        if topic is None:
+            print(f"{canon.tag} has no topic {ref!r}", file=sys.stderr)
+            return 1
+        handle = canon.file_for(topic)
+        span = topic.page_range
+        if handle is None or span is None:
+            print(f"{canon.tag} {ref} has no file recorded", file=sys.stderr)
+            return 1
+        printed = int(page)
+        if not span[0] <= printed <= span[1]:
+            # Not fatal: a figure for a topic often sits a page outside it.
+            print(f"  note: printed page {printed} is outside {ref}'s "
+                  f"pp. {topic.pages}", file=sys.stderr)
+        path = f"{canon.root}/{handle.path}" if canon.root else handle.path
+        out = f"{canon.course_id}-p{printed}"
+        print(f"{canon.tag} {ref}  printed p. {printed} -> pdf p. "
+              f"{handle.pdf_page(printed)}")
+        # -singlefile, so the output is exactly <out>.png. Without it
+        # pdftoppm appends the page number padded to the width of the
+        # document's last page, so the same command yields "-19" in a 62-page
+        # chapter and "-019" in a 579-page book -- and the embed would be
+        # wrong in a way nobody would predict.
+        print(f'  pdftoppm -f {handle.pdf_page(printed)} '
+              f'-l {handle.pdf_page(printed)} -r 150 -png -singlefile '
+              f'"$SUBJECT_ROOT/{path}" /vault/attachments/{out}')
+        print(f"  then embed:  ![[{out}.png]]")
         return 0
 
     if action == "seed":
