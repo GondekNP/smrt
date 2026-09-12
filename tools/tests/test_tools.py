@@ -92,12 +92,16 @@ class TestOptionLint(Base):
     def test_a_clean_question_warns_about_nothing(self) -> None:
         self.assertEqual(self.pose().warnings, [])
 
-    def test_justification_inside_an_option_is_flagged(self) -> None:
-        posed = self.pose(options=[
-            QuizOption(id="a", text="the mean, because it maximizes the likelihood"),
-            QuizOption(id="b", text="the variance"),
-        ])
-        self.assertTrue(any("because" in w for w in posed.warnings))
+    def test_justification_inside_an_option_is_refused_not_warned(self) -> None:
+        """Promoted from a warning on 2026-09-12. The style tells stay
+        advisory; this one is structural, and a live probe showed what it
+        costs -- the learner's justification can only restate the option."""
+        with self.assertRaisesRegex(ToolError, "because"):
+            self.pose(options=[
+                QuizOption(id="a",
+                           text="the mean, because it maximizes the likelihood"),
+                QuizOption(id="b", text="the variance"),
+            ])
 
     def test_the_correct_option_being_longest_is_flagged(self) -> None:
         """The number one giveaway, per rule 1."""
@@ -447,3 +451,92 @@ def _placeholder_args(name: str):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestOptionsMayNotExplainThemselves(unittest.TestCase):
+    """Verbatim from the first live probe, 2026-09-12.
+
+    The learner's report: "a-d also give me a lot of context, and it wants a
+    one-line reason, it seems the obvious answer is to just reiterate what the
+    answer is." Exactly right, and it makes the two-call design pointless --
+    the justification measures nothing if the option already contains it.
+    """
+
+    # The option that got through. `so` was matched only as "so that", and
+    # `means` only as "which means", so no keyword fired; at 1.38x the mean
+    # distractor length it also slipped under the 1.5x check.
+    LEAKED = ("The curvature (second derivative) of the LL near the MLE — a "
+              "sharper peak means the LL drops fast as θ moves away from the "
+              "MLE, so the data rule out nearby values strongly.")
+    # The agent's own regeneration once the length check did fire. This one
+    # must keep passing: it is the control that says the rule is not simply
+    # "refuse anything detailed".
+    CLEAN = ("The second-derivative matrix of NLL, which is the same thing as "
+             "the observed Fisher information matrix.")
+
+    def pose(self, correct_text: str, **kw):
+        options = [
+            QuizOption(id="A", text=correct_text),
+            QuizOption(id="B", text="The maximized LL value itself."),
+            QuizOption(id="C", text="The location of the MLE versus the truth."),
+            QuizOption(id="D", text="The width of the range where LL is finite."),
+        ]
+        return quiz(prompt="Which one?", options=options,
+                    correct_option_id="A",
+                    explanation="Curvature carries the information.",
+                    **kw)
+
+    def test_the_option_that_got_through_is_now_refused(self) -> None:
+        with self.assertRaises(ToolError) as caught:
+            self.pose(self.LEAKED)
+        self.assertIn("restate", str(caught.exception))
+
+    def test_a_bare_claim_with_a_relative_clause_still_passes(self) -> None:
+        """The control. "which is the same thing as" describes the claim; it
+        does not argue for it."""
+        self.assertTrue(self.pose(self.CLEAN).question_id)
+
+    def test_a_dash_followed_by_an_argument_is_refused(self) -> None:
+        with self.assertRaises(ToolError):
+            self.pose("The curvature of the LL near the MLE — the data rule "
+                      "out nearby values strongly.")
+
+    def test_a_short_aside_after_a_dash_is_not_an_argument(self) -> None:
+        self.assertTrue(self.pose("The curvature — the second derivative.")
+                        .question_id)
+
+    def test_a_leaking_distractor_is_refused_too(self) -> None:
+        """Not only the correct option. A distractor that argues for itself
+        is just as readable a tell."""
+        with self.assertRaises(ToolError) as caught:
+            quiz(
+                prompt="Which one?",
+                options=[
+                    QuizOption(id="A", text="g''(θ₀) = -f''(θ₀), always."),
+                    QuizOption(id="B", text="g''(θ₀) = f''(θ₀), always, since "
+                                            "negating a function just reflects "
+                                            "its graph."),
+                ],
+                correct_option_id="A",
+                explanation="Differentiation is linear.",
+            )
+        self.assertIn("'B'", str(caught.exception))
+
+    def test_being_the_longest_is_flagged_below_the_old_threshold(self) -> None:
+        """1.38x was under the 1.5x bar and still the giveaway."""
+        options = [
+            server.QuizOption(id="A", text="x" * 172),
+            server.QuizOption(id="B", text="x" * 144),
+            server.QuizOption(id="C", text="x" * 152),
+            server.QuizOption(id="D", text="x" * 79),
+        ]
+        self.assertTrue(any("longest" in w
+                            for w in server._lint_options(options, "A")))
+
+    def test_a_short_correct_option_is_not_flagged(self) -> None:
+        options = [
+            server.QuizOption(id="A", text="x" * 40),
+            server.QuizOption(id="B", text="x" * 144),
+            server.QuizOption(id="C", text="x" * 152),
+        ]
+        self.assertEqual(server._lint_options(options, "A"), [])

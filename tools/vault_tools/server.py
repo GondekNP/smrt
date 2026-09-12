@@ -262,42 +262,94 @@ _OUTCOMES: dict[tuple[bool, str], tuple[str, str]] = {
 
 # Rule 1 of distractor construction: every option is a bare claim. These are
 # the words that smuggle a justification into one.
+#
+# Widened on 2026-09-12 after a live probe got through with
+#
+#   "The curvature (second derivative) of the LL near the MLE — a sharper peak
+#    means the LL drops fast as θ moves away, so the data rule out nearby
+#    values strongly."
+#
+# `so` was only matched as "so that", and `means` only as "which means", so
+# nothing fired. The learner's complaint was precise: when the option carries
+# the reasoning, the one-line justification has nothing to do but restate it,
+# and the pick-plus-reason design loses the half that makes it worth two calls.
 _JUSTIFYING = re.compile(
     r"\b(because|since|therefore|thus|hence|as a result|which means|"
-    r"so that|due to|owing to)\b",
+    r"so that|due to|owing to|so|means|meaning|indicates|indicating|"
+    r"implies|implying|i\.e\.|in other words|that is why)\b",
     re.IGNORECASE,
 )
 
+# The dominant shape of a leaking option, and the one no keyword caught: a
+# bare claim, a dash, and then the explanation of why it is right. Every
+# leaking option in the first live probe had exactly this form.
+_APPOSITIVE = re.compile(r"\s[—–]\s|\s--\s")
+# Below this, a trailing clause is an aside rather than an argument.
+_APPOSITIVE_WORDS = 6
+
+
+def _leaking(options: list[QuizOption]) -> list[str]:
+    """Options carrying their own reasoning. Structural, so it is refused.
+
+    Split out from the warnings on 2026-09-12. The soft tells stay advisory
+    because they are heuristics about *style*; this one is not. An option
+    that explains itself destroys the thing the two-call design exists for —
+    the learner's justification becomes a restatement of the option, and the
+    `sound`/`coherent`/`incoherent` judgment measures nothing.
+
+    The live evidence cuts both ways and is worth keeping in mind: when the
+    length warning did fire, the agent regenerated without being told to. So
+    the mechanism works, and detection was what failed. It is a refusal
+    anyway, because "the agent usually notices" is exactly the kind of
+    guarantee this design does not accept elsewhere.
+    """
+    faults: list[str] = []
+    for option in options:
+        found = _JUSTIFYING.search(option.text)
+        if found:
+            faults.append(
+                f"option {option.id!r} contains {found.group(0)!r}, which "
+                "reads as justification"
+            )
+            continue
+        parts = _APPOSITIVE.split(option.text)
+        if len(parts) > 1 and len(parts[-1].split()) >= _APPOSITIVE_WORDS:
+            faults.append(
+                f"option {option.id!r} is a claim followed by a dash and "
+                f"{len(parts[-1].split())} more words, which is an "
+                "explanation of why it is right"
+            )
+    return faults
+
 
 def _lint_options(options: list[QuizOption], correct_option_id: str) -> list[str]:
-    """Check the documented tells mechanically, and warn rather than refuse.
+    """Check the documented style tells mechanically, and warn rather than refuse.
 
     These are the failure modes `docs/teaching-loop.md` names, and they are
     exactly the kind a model does not notice in its own output. Warnings, not
     errors, for two reasons: a false positive must never cost a lesson, and
     the fix for a real one is "regenerate, don't patch", which is a judgment
-    the agent has to make.
+    the agent has to make. The one structural fault is refused instead; see
+    `_leaking`.
     """
     warnings: list[str] = []
-
-    for option in options:
-        found = _JUSTIFYING.search(option.text)
-        if found:
-            warnings.append(
-                f"option {option.id!r} contains {found.group(0)!r}, which "
-                "reads as justification — every option must be a bare claim, "
-                "with all reasoning in `explanation`"
-            )
 
     correct = next(o for o in options if o.id == correct_option_id)
     distractors = [o for o in options if o.id != correct_option_id]
     if distractors:
         mean = sum(len(o.text) for o in distractors) / len(distractors)
-        if mean and len(correct.text) > 1.5 * mean:
+        longest = len(correct.text) > max(len(o.text) for o in distractors)
+        # 1.5x alone missed a real case: 172 chars against a 125-char mean is
+        # only 1.38x, and it was still both the longest option and the one
+        # carrying the answer. Being the longest is the tell; the ratio only
+        # says how loudly.
+        if mean and (len(correct.text) > 1.5 * mean
+                     or (longest and len(correct.text) > 1.25 * mean)):
             warnings.append(
                 f"the correct option is {len(correct.text) / mean:.1f}x the "
-                "mean distractor length — the number one giveaway. Regenerate "
-                "rather than trimming"
+                "mean distractor length"
+                + (" and the longest of them" if longest else "")
+                + " — the number one giveaway. Regenerate rather than trimming"
             )
 
     bolded = [o.id for o in options if "**" in o.text]
@@ -351,6 +403,17 @@ def quiz(
         raise ToolError(
             "explanation is required: it carries the reasoning that the "
             "options are forbidden to contain"
+        )
+
+    leaks = _leaking(options)
+    if leaks:
+        raise ToolError(
+            "the options carry their own reasoning, so the learner's "
+            "justification can only restate them: " + "; ".join(leaks)
+            + ". Every option is a bare claim; all reasoning goes in "
+            "`explanation`, which the learner sees only after answering. "
+            "Regenerate the whole set rather than trimming the offender — "
+            "the others were written to match it."
         )
 
     question_id = _new_id("quiz")

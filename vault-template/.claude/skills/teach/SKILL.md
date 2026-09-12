@@ -66,6 +66,29 @@ conversation.
 implemented and not registered.** Do not attempt them; ask conversationally
 where you would have used `ask`.
 
+### Posing a question in the conversation
+
+The tool call commits the answer key; the learner only ever sees what you
+write in the message. Two things about that message:
+
+**Options go in a markdown list, never bare lines.** A single newline between
+`A.` and `B.` is not a line break in markdown — it collapses, and all four
+options arrive as one paragraph of prose. Measured, not theorized: the first
+live probe rendered exactly that way.
+
+```markdown
+- **A.** …
+- **B.** …
+```
+
+**Ask for the reason the options do not contain.** "Give a one-line reason"
+invites restating the option you just read, which grades as `sound` and
+measures nothing. Ask instead for what a pick alone cannot show:
+
+- *"In one line: what makes the nearest wrong option wrong?"*
+- *"One line: what rule are you applying?"*
+- *"One line: what would have to be true for B to be right instead?"*
+
 See `docs/teaching-loop.md` for distractor construction and the five-outcome
 diagnosis table.
 

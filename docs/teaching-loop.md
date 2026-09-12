@@ -117,6 +117,33 @@ Distractor construction, worth preserving verbatim from the source skill:
 If you can tell which is right while cold on the material, steps 1 or 2 were
 skipped. Regenerate, don't patch.
 
+**Rule 1 is enforced, not requested** — `quiz` refuses a set whose options
+argue for themselves. The first live probe, 2026-09-12, is why:
+
+> The curvature (second derivative) of the LL near the MLE — a sharper peak
+> means the LL drops fast as θ moves away, so the data rule out nearby values
+> strongly.
+
+Nothing fired. `so` was matched only as "so that" and `means` only as "which
+means", and at 1.38× the mean distractor length it slipped under a 1.5× bar.
+The learner's report was the precise diagnosis: *"it wants a one-line reason,
+it seems the obvious answer is to just reiterate what the answer is."* Which
+makes the second half of the design worthless — a justification that restates
+the option grades `sound` and measures nothing.
+
+So the keyword list is wider, a dash followed by six or more words is treated
+as an argument, and being the longest option now counts at 1.25×. The style
+tells stay warnings; this one refuses. Worth recording that when the length
+warning *did* fire on a later question, the agent regenerated unprompted — the
+mechanism worked and detection was what failed. It is a refusal anyway,
+because "the agent usually notices" is not a guarantee this design accepts
+anywhere else.
+
+**Asking for the reason is a separate skill.** "Give a one-line reason" invites
+restatement. Ask for what the pick cannot show: what makes the nearest wrong
+option wrong, which rule was applied, what would have to change for another
+option to win.
+
 **Used heavily in probe**, where twelve cheap signals beat twelve essays.
 
 ### `explain` — free response, rubric-graded
