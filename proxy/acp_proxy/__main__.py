@@ -11,6 +11,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+from . import mdlog
 from .inject import SpecError, parse_spec
 from .proxy import run
 from .trace import Trace, _warn, default_trace_path
@@ -42,6 +43,9 @@ Options:
                       --mcp 'probe=python3 -m acp_proxy.mcp_probe'
   --trace PATH      write the trace here
   --no-trace        do not write a trace
+  --md-log DIR      mirror the session to markdown in DIR, for reading with
+                    the math rendered. Defaults to /vault/logs when it exists.
+  --no-md-log       do not write the markdown mirror
   --no-compat       do not repair tool-call frames Toad would refuse.
                     See compat.py — that repair is a workaround for a Toad
                     defect, and this flag is how you check if it is still
@@ -68,17 +72,21 @@ class UsageError(Exception):
 
 def parse_args(
     argv: list[str],
-) -> tuple[list[str] | None, Path | None, list[dict], bool]:
-    """Return `(backend_command, trace_path, mcp_servers, compat_repairs)`.
+) -> tuple[list[str] | None, Path | None, list[dict], bool, Path | None]:
+    """Return `(backend_command, trace_path, mcp_servers, compat_repairs,
+    md_log_dir)`.
 
     A `None` backend command means help was asked for. A `None` trace path
-    means tracing is off.
+    means tracing is off, and a `None` md-log dir means the markdown mirror
+    is off.
     """
     backend_cmd: list[str] | None = None
     trace_path: Path | None = None
     mcp_servers: list[dict] = []
     trace_off = False
     compat_repairs = True
+    md_dir: Path | None = None
+    md_off = False
     rest = list(argv)
 
     while rest:
@@ -87,7 +95,7 @@ def parse_args(
             backend_cmd = rest
             rest = []
         elif arg in ("-h", "--help"):
-            return None, None, [], True
+            return None, None, [], True, None
         elif arg == "--backend":
             name = _value(rest, "--backend")
             if name not in BACKENDS:
@@ -107,6 +115,12 @@ def parse_args(
             trace_path = Path(arg.split("=", 1)[1])
         elif arg == "--no-trace":
             trace_off = True
+        elif arg == "--md-log":
+            md_dir = Path(_value(rest, "--md-log"))
+        elif arg.startswith("--md-log="):
+            md_dir = Path(arg.split("=", 1)[1])
+        elif arg == "--no-md-log":
+            md_off = True
         elif arg == "--no-compat":
             compat_repairs = False
         else:
@@ -119,10 +133,11 @@ def parse_args(
     if len(names) != len(set(names)):
         raise SpecError(f"duplicate --mcp names: {names}")
 
+    md_target = None if md_off else (md_dir or mdlog.default_dir())
     if trace_off:
-        return backend_cmd, None, mcp_servers, compat_repairs
+        return backend_cmd, None, mcp_servers, compat_repairs, md_target
     return (backend_cmd, trace_path or default_trace_path(), mcp_servers,
-            compat_repairs)
+            compat_repairs, md_target)
 
 
 def _value(rest: list[str], flag: str) -> str:
@@ -134,7 +149,8 @@ def _value(rest: list[str], flag: str) -> str:
 def main(argv: list[str] | None = None) -> int:
     args = list(sys.argv[1:] if argv is None else argv)
     try:
-        backend_cmd, trace_path, mcp_servers, compat_repairs = parse_args(args)
+        (backend_cmd, trace_path, mcp_servers, compat_repairs,
+         md_dir) = parse_args(args)
     except (UsageError, SpecError) as error:
         # stderr, and a non-zero exit — the combination Toad actually surfaces.
         _warn(str(error))
@@ -146,8 +162,10 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     trace = Trace(trace_path)
+    md = mdlog.MdLog(md_dir, trace)
+    trace.note("md_log", path=str(md.path) if md.path else None)
     try:
-        return run(backend_cmd, trace, mcp_servers, compat_repairs)
+        return run(backend_cmd, trace, mcp_servers, compat_repairs, md)
     finally:
         trace.close()
 

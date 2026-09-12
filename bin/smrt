@@ -226,6 +226,11 @@ fi
 MOUNTS+=(-v "$STATE/toad:/home/smrt/.config/toad")
 MOUNTS+=(-v "$STATE/state:/home/smrt/.local/state")
 
+# The container is UTC without this, and the proxy names its markdown session
+# logs by local date — so an evening session lands in your vault under
+# tomorrow's date. Read-only, and skipped if the host has no zoneinfo.
+[ -e /etc/localtime ] && MOUNTS+=(-v "/etc/localtime:/etc/localtime:ro")
+
 # --- live-mounted source, for development ----------------------------------
 # Both components are baked into the image, which means editing either one
 # normally costs a rebuild — the recorded downside of running them in-container

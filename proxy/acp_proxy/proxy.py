@@ -36,7 +36,7 @@ import subprocess
 import sys
 import threading
 
-from . import compat, inject
+from . import compat, inject, mdlog
 from .trace import AGENT_TO_CLIENT, CLIENT_TO_AGENT, Trace, _warn
 
 # How long to let the backend exit on its own after its stdin is closed, before
@@ -61,6 +61,7 @@ def run(
     trace: Trace,
     mcp_servers: list[dict] | None = None,
     compat_repairs: bool = True,
+    md: mdlog.MdLog | None = None,
 ) -> int:
     """Proxy stdio between our own client and `backend_cmd`. Returns an exit
     code suitable for `sys.exit`.
@@ -70,7 +71,8 @@ def run(
     refuse are repaired on the way back — see `compat.py`, and note that module
     is a workaround with a follow-up attached, not a feature.
     """
-    return _Proxy(backend_cmd, trace, mcp_servers or [], compat_repairs).run()
+    return _Proxy(backend_cmd, trace, mcp_servers or [], compat_repairs,
+                  md).run()
 
 
 class _Proxy:
@@ -80,11 +82,15 @@ class _Proxy:
         trace: Trace,
         mcp_servers: list[dict] | None = None,
         compat_repairs: bool = True,
+        md: mdlog.MdLog | None = None,
     ) -> None:
         self.backend_cmd = backend_cmd
         self.trace = trace
         self.mcp_servers = mcp_servers or []
         self.compat_repairs = compat_repairs
+        # Observation only, and fed before any rewriting: the mirror records
+        # the session as the agent sent it, not as the client would accept it.
+        self.md = md if md is not None else mdlog.MdLog(None)
         self.proc: subprocess.Popen[bytes] | None = None
         self._shutdown_lock = threading.Lock()
 
@@ -137,6 +143,7 @@ class _Proxy:
         # before exiting; without this the last frames of a turn can be lost.
         threads[1].join(timeout=5.0)
 
+        self.md.close()
         self.trace.note("exit", code=code)
         try:
             sys.stdout.buffer.flush()
@@ -259,6 +266,7 @@ class _Proxy:
         # `mcp_servers_observed` keeps reporting what the client really sent.
         self.trace.frame(direction, line, parsed)
         self._observe(direction, parsed)
+        self.md.observe(direction, parsed)
 
         if direction == CLIENT_TO_AGENT and self.mcp_servers:
             return self._rewrite(
