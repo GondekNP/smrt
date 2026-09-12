@@ -69,6 +69,7 @@ from __future__ import annotations
 import hashlib
 import os
 import re
+import random
 import secrets
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -133,6 +134,9 @@ class _PosedQuiz:
     correct_option_id: str
     explanation: str
     answered: bool = False
+    #: Displayed label -> the id the agent authored. Kept so the explanation,
+    #: which may refer to the authored ids, stays readable after shuffling.
+    authored: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass
@@ -322,6 +326,43 @@ def _leaking(options: list[QuizOption]) -> list[str]:
     return faults
 
 
+# Shuffling is off when this is set, so tests and any reproducible replay get
+# the authored order. Not a general "disable" switch -- a real session should
+# always shuffle.
+_SHUFFLE = os.environ.get("SMRT_QUIZ_SHUFFLE", "on").lower() != "off"
+_RNG = random.Random()
+
+
+def _shuffle(
+    options: list[QuizOption], correct_option_id: str, requested: bool
+) -> tuple[list[QuizOption], dict[str, str], str]:
+    """Reorder the options and relabel them A, B, C… by position.
+
+    Two problems, one fix. A model writing four options has habits about where
+    it puts the right one, and a learner reading them has habits about where
+    they look; neither is visible in the authored order. Borrowed from
+    `amosblomqvist/learn`, which shuffles before display for the same reason.
+
+    Relabelling by position is what makes it usable rather than merely random.
+    Reordering while keeping the authored ids would show the learner "C" first,
+    which reads as a bug. So the displayed labels are always A, B, C… in the
+    order shown, and `authored` keeps the mapping back for the record.
+
+    Returns (what to show, displayed label -> authored id, the correct label).
+    """
+    order = list(options)
+    if requested and _SHUFFLE:
+        _RNG.shuffle(order)
+    labels = [chr(ord("A") + i) for i in range(len(order))]
+    shown = [QuizOption(id=label, text=o.text) for label, o in zip(labels, order)]
+    authored = {label: o.id for label, o in zip(labels, order)}
+    correct_label = next(
+        label for label, original in authored.items()
+        if original == correct_option_id
+    )
+    return shown, authored, correct_label
+
+
 def _lint_options(options: list[QuizOption], correct_option_id: str) -> list[str]:
     """Check the documented style tells mechanically, and warn rather than refuse.
 
@@ -369,11 +410,18 @@ def quiz(
     correct_option_id: str,
     explanation: str,
     hint: str | None = None,
+    shuffle: bool = True,
 ) -> QuizPosed:
     """Pose multiple choice requiring a pick AND a one-line justification.
 
     Returns only what the learner may see, and commits the answer key. Grade
     the reply with `answer_quiz`, which computes whether the pick was right.
+
+    **Pose the options in the order and with the labels this returns.** They
+    are shuffled and relabelled A, B, C… by position, so the authored order is
+    not what the learner sees and `correct_option_id` no longer names the
+    answer they will pick. Pass `shuffle=False` only when the order carries
+    meaning — steps in a sequence, magnitudes to rank.
 
     Distractor construction — write the correct claim first, then mutate it
     into each distractor by stating what someone holding a specific
@@ -416,17 +464,20 @@ def quiz(
             "the others were written to match it."
         )
 
+    shown, authored, correct_label = _shuffle(options, correct_option_id, shuffle)
+
     question_id = _new_id("quiz")
     _QUIZZES[question_id] = _PosedQuiz(
         prompt=prompt,
-        option_ids=ids,
-        correct_option_id=correct_option_id,
+        option_ids=[o.id for o in shown],
+        correct_option_id=correct_label,
         explanation=explanation,
+        authored=authored,
     )
     return QuizPosed(
         question_id=question_id,
         prompt=prompt,
-        options=options,
+        options=shown,
         hint=hint,
         warnings=_lint_options(options, correct_option_id),
     )

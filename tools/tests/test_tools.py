@@ -46,6 +46,9 @@ class Base(unittest.TestCase):
             ],
             correct_option_id="a",
             explanation="The mean maximizes the normal likelihood.",
+            # These tests are about grading, not about display order. Shuffling
+            # is exercised on its own in TestShuffle.
+            shuffle=False,
         )
         kwargs.update(over)
         return quiz(**kwargs)
@@ -139,19 +142,19 @@ class TestAnswerQuiz(Base):
                          inspect.signature(answer_quiz).parameters)
 
         posed = self.pose()
-        wrong = answer_quiz(posed.question_id, pick="b",
+        wrong = answer_quiz(posed.question_id, pick="B",
                             reason="variance feels right",
                             reason_verdict="coherent")
         self.assertFalse(wrong.pick_correct)
 
     def test_the_outcomes_match_the_documented_table(self) -> None:
         cases = {
-            ("a", "sound"): "solid",
-            ("a", "coherent"): "lucky_guess",
-            ("a", "incoherent"): "lucky_guess",
-            ("b", "sound"): "slip",
-            ("b", "coherent"): "misconception",
-            ("b", "incoherent"): "gap",
+            ("A", "sound"): "solid",
+            ("A", "coherent"): "lucky_guess",
+            ("A", "incoherent"): "lucky_guess",
+            ("B", "sound"): "slip",
+            ("B", "coherent"): "misconception",
+            ("B", "incoherent"): "gap",
         }
         for (pick, verdict), expected in cases.items():
             posed = self.pose()
@@ -168,7 +171,7 @@ class TestAnswerQuiz(Base):
         mis-click."""
         posed = self.pose()
         result = answer_quiz(
-            posed.question_id, pick="b",
+            posed.question_id, pick="B",
             reason="it maximizes the likelihood of the data we observed, "
                    "given a fixed theta",
             reason_verdict="sound",
@@ -182,12 +185,12 @@ class TestAnswerQuiz(Base):
     def test_an_unknown_verdict_is_refused(self) -> None:
         posed = self.pose()
         with self.assertRaisesRegex(ToolError, "reason_verdict must be"):
-            answer_quiz(posed.question_id, pick="a", reason="r",
+            answer_quiz(posed.question_id, pick="A", reason="r",
                         reason_verdict="maybe")
 
     def test_the_explanation_is_released_only_now(self) -> None:
         posed = self.pose()
-        result = answer_quiz(posed.question_id, pick="a", reason="r",
+        result = answer_quiz(posed.question_id, pick="A", reason="r",
                              reason_verdict="sound")
         self.assertIn("maximizes the normal likelihood", result.explanation)
 
@@ -195,15 +198,15 @@ class TestAnswerQuiz(Base):
         """Re-answering would let a learner converge by elimination, which
         destroys the signal the question was posed to collect."""
         posed = self.pose()
-        answer_quiz(posed.question_id, pick="b", reason="r", reason_verdict="incoherent")
+        answer_quiz(posed.question_id, pick="B", reason="r", reason_verdict="incoherent")
         with self.assertRaisesRegex(ToolError, "already been answered"):
-            answer_quiz(posed.question_id, pick="a", reason="r",
+            answer_quiz(posed.question_id, pick="A", reason="r",
                         reason_verdict="sound")
 
     def test_unknown_question_id_says_what_is_known(self) -> None:
         posed = self.pose()
         with self.assertRaises(ToolError) as caught:
-            answer_quiz("quiz-nope", pick="a", reason="r", reason_verdict="sound")
+            answer_quiz("quiz-nope", pick="A", reason="r", reason_verdict="sound")
         self.assertIn(posed.question_id, str(caught.exception))
 
     def test_a_pick_outside_the_options_is_refused(self) -> None:
@@ -217,7 +220,7 @@ class TestAnswerQuiz(Base):
         tool exists to avoid."""
         posed = self.pose()
         with self.assertRaisesRegex(ToolError, "reason is required"):
-            answer_quiz(posed.question_id, pick="a", reason="  ",
+            answer_quiz(posed.question_id, pick="A", reason="  ",
                         reason_verdict="sound")
 
 
@@ -540,3 +543,78 @@ class TestOptionsMayNotExplainThemselves(unittest.TestCase):
             server.QuizOption(id="C", text="x" * 152),
         ]
         self.assertEqual(server._lint_options(options, "A"), [])
+
+
+class TestShuffle(unittest.TestCase):
+    """Borrowed from `amosblomqvist/learn`, which shuffles before display so
+    that grading matches the order the learner saw.
+
+    Two habits it defeats, neither visible in the authored order: where a model
+    tends to put the right answer, and where a reader tends to look.
+    """
+
+    FOUR = [QuizOption(id=str(i), text=f"claim {i}") for i in range(1, 5)]
+
+    def pose(self, **over):
+        kwargs = dict(prompt="Which one?", options=self.FOUR,
+                      correct_option_id="1", explanation="Because.")
+        kwargs.update(over)
+        return quiz(**kwargs)
+
+    def test_options_are_relabelled_by_position(self) -> None:
+        """Reordering while keeping the authored ids would show the learner
+        "C" first, which reads as a bug."""
+        posed = self.pose()
+        self.assertEqual([o.id for o in posed.options], ["A", "B", "C", "D"])
+
+    def test_the_texts_are_preserved_exactly(self) -> None:
+        posed = self.pose()
+        self.assertEqual(sorted(o.text for o in posed.options),
+                         ["claim 1", "claim 2", "claim 3", "claim 4"])
+
+    def test_the_key_follows_the_option_it_belongs_to(self) -> None:
+        """The whole thing is wrong if the answer stays at a fixed label."""
+        for _ in range(40):
+            posed = self.pose()
+            shown = {o.id: o.text for o in posed.options}
+            key = server._QUIZZES[posed.question_id].correct_option_id
+            self.assertEqual(shown[key], "claim 1")
+
+    def test_the_answer_does_not_sit_at_one_label(self) -> None:
+        """40 draws over 4 positions landing on one label every time would be
+        1 in 4^39. If this ever fails, shuffling silently stopped."""
+        seen = {server._QUIZZES[self.pose().question_id].correct_option_id
+                for _ in range(40)}
+        self.assertGreater(len(seen), 1)
+
+    def test_grading_uses_the_displayed_label(self) -> None:
+        posed = self.pose()
+        key = server._QUIZZES[posed.question_id].correct_option_id
+        result = answer_quiz(posed.question_id, pick=key, reason="r",
+                             reason_verdict="sound")
+        self.assertTrue(result.pick_correct)
+        self.assertEqual(result.diagnosis, "solid")
+
+    def test_an_authored_id_is_no_longer_a_valid_pick(self) -> None:
+        """The authored ids are gone from the learner's view, so accepting one
+        would mean grading something they were never shown."""
+        posed = self.pose()
+        with self.assertRaisesRegex(ToolError, "not one of"):
+            answer_quiz(posed.question_id, pick="1", reason="r",
+                        reason_verdict="sound")
+
+    def test_shuffle_false_keeps_the_authored_order(self) -> None:
+        """For questions where the order carries meaning — steps in a
+        sequence, magnitudes to rank."""
+        posed = self.pose(shuffle=False)
+        self.assertEqual([o.text for o in posed.options],
+                         ["claim 1", "claim 2", "claim 3", "claim 4"])
+        self.assertEqual(server._QUIZZES[posed.question_id].correct_option_id,
+                         "A")
+
+    def test_the_mapping_back_to_authored_ids_is_kept(self) -> None:
+        """So the explanation, which may name an authored id, stays readable."""
+        posed = self.pose()
+        authored = server._QUIZZES[posed.question_id].authored
+        self.assertEqual(sorted(authored), ["A", "B", "C", "D"])
+        self.assertEqual(sorted(authored.values()), ["1", "2", "3", "4"])

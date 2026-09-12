@@ -70,6 +70,9 @@ QUIZ = {
                 {"id": "b", "text": "the sample median"}],
     "correct_option_id": "a",
     "explanation": "The mean maximizes the normal likelihood.",
+    # This fixture is about what survives the wire, so the displayed order has
+    # to be predictable: "A" is the sample mean, "B" the median.
+    "shuffle": False,
 }
 
 RUBRIC = ["the score has mean zero",
@@ -173,7 +176,7 @@ class TestRoundTrip(unittest.TestCase):
             posed = payload(await session.call_tool("quiz", QUIZ))
             answered = await session.call_tool("answer_quiz", {
                 "question_id": posed["question_id"],
-                "pick": "b",
+                "pick": "B",
                 "reason": "the median is robust, so it must be the MLE",
                 # Coherent, not sound: a position someone could hold, and
                 # wrong. "sound" here would make it a slip.
