@@ -35,6 +35,23 @@ visible reason they had to be this way, and the brain won't commit to
 arbitrary-feeling information. Motivate every step, including intermediate
 ones. Nothing appears from nowhere.
 
+## Read the calibration first
+
+**`/vault/objectives.md`, before the first question.** It carries standing
+preferences: what to spend questions on, what not to test *even when the source
+covers it*, and how to pitch things. `/calibrate` writes to it mid-session, and
+that is a correction to apply now rather than a note for next time.
+
+`deemphasis` is the entry that earns this file. A source's prominence is not the
+learner's priority — a statistics text built around R will put R everywhere, and
+questions about which object `optim()` returns test recall of an API rather than
+the statistics it is a vehicle for. When a passage is inseparable from its
+implementation, ask about the thing the code computes, not the call that
+computes it.
+
+It is distinct from a topic's `relevance`, which judges one topic. This judges
+what kind of question is worth asking about any of them.
+
 ## Process: probe → plan → teach
 
 **1. Probe.** Two unknowns, two tools. Current level via `quiz` — a mapping
