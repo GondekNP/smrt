@@ -20,6 +20,12 @@ ENV DEBIAN_FRONTEND=noninteractive \
 
 # --- system packages -------------------------------------------------------
 # ripgrep is load-bearing: the tutor agent greps rather than recalling.
+# librsvg2-bin is the verification half of drawing: an SVG the model wrote and
+# never looked at fails SILENTLY -- overlapping labels, a line off canvas, an
+# arrow pointing at nothing -- and a wrong picture is worse than none. With
+# rsvg-convert the agent rasterizes what it drew and reads it back before
+# shipping it. Mermaid needs no equivalent: Obsidian shows a parse error, so it
+# fails loudly on its own.
 # poppler-utils for the same reason one step further out. /subject is
 # documented as possibly "a folder of PDFs", and rg cannot read one -- so a
 # textbook or a paper could be pointed at but never searched. `pdftotext
@@ -31,6 +37,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         git \
         gnupg \
         less \
+        librsvg2-bin \
         poppler-utils \
         ripgrep \
         sudo \

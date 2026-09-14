@@ -38,7 +38,7 @@ docker run --rm "$IMAGE" bash -c '
 for c in toad claude claude-agent-acp opencode \
          smrt-acp-proxy smrt-mcp-probe vault-tools \
          smrt-curriculum smrt-ledger \
-         pixi git rg pdftotext python3; do
+         pixi git rg pdftotext rsvg-convert python3; do
     if command -v "$c" >/dev/null 2>&1; then
         printf "  %-17s %s\n" "$c" "$(command -v "$c")"
     else

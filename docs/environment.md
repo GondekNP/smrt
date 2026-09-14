@@ -75,6 +75,22 @@ lives under `$HOME` so no sudo is needed to add agents at runtime.
 before asserting — reading a large codebase from memory is where confabulated
 call graphs come from. `rg` is how it checks.
 
+**librsvg2-bin is the verification half of drawing.** An SVG the model wrote
+and never looked at fails *silently* — overlapping labels, a line off the
+canvas, an arrow pointing at nothing all render happily and all are wrong. With
+`rsvg-convert` the agent rasterizes what it drew and reads it back before
+shipping it. Mermaid needs no equivalent, because Obsidian shows a parse error
+and it fails loudly on its own. 9 MB, mostly cairo and pango.
+
+**Nothing numeric is installed, and that is a decision.** No numpy, no
+matplotlib, no R. It means a figure with data in it cannot be produced here,
+and the `visualize` skill's hard rule follows from that: if a figure would have
+numbers on an axis, do not draw it. A hand-authored posterior or MCMC trace is
+a picture of a guess wearing the costume of a measurement, and a plot reads as
+evidence in a way prose does not. Revisit when a lesson is genuinely blocked on
+one — Kéry's `CompanionR/` scripts, one per chapter, are the obvious first
+thing to run, which would mean R rather than Python.
+
 **poppler-utils for the same reason one step out.** `/subject` is documented
 above as possibly "a folder of PDFs", and `rg` cannot read one — so until
 2026-09-11 a textbook or paper could be mounted and never searched. `pdftotext`

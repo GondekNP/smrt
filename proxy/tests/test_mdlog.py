@@ -313,3 +313,28 @@ class TestMessagesDoNotRunTogether(Base):
         self.assertNotIn("First message.Second message.", written)
         self.assertIn("First message.", written)
         self.assertIn("Second message.", written)
+
+
+class TestDrawingsSurvive(Base):
+    """Figures reach the log as text in the agent's message — there is no
+    machinery for them, which is the point. These assert the mirror does not
+    become machinery by accident."""
+
+    SVG = ('<svg viewBox="0 0 100 50" xmlns="http://www.w3.org/2000/svg">\n'
+           '  <circle cx="50" cy="25" r="20" fill="none" '
+           'stroke="currentColor"/>\n</svg>')
+
+    def test_inline_svg_passes_through_byte_for_byte(self) -> None:
+        self.feed(text(self.SVG))
+        self.assertIn(self.SVG, self.read())
+
+    def test_a_fenced_mermaid_block_survives(self) -> None:
+        block = '```mermaid\ngraph LR\n  A["π P = π"] --> B\n```'
+        self.feed(text(block))
+        self.assertIn(block, self.read())
+
+    def test_a_drawing_split_across_chunks_is_rejoined(self) -> None:
+        """Streaming deltas cut wherever they like, including mid-tag."""
+        half = len(self.SVG) // 2
+        self.feed(text(self.SVG[:half]), text(self.SVG[half:]))
+        self.assertIn(self.SVG, self.read())

@@ -317,8 +317,15 @@ background it silently assumes — that is where the actual teaching is.
 
 ## Rendering
 
-Obsidian renders LaTeX and mermaid natively. Inline `$f(x)$`, display fenced
-in `$$`. Write math properly rather than in ASCII approximation.
+Obsidian renders LaTeX and mermaid natively, and the session log is read there.
+Inline `$f(x)$`, display fenced in `$$`. Write math properly rather than in
+ASCII approximation.
+
+**A picture when the idea is shaped rather than stated** — geometry, a
+dependency, a projection. See the `visualize` skill, and its one hard rule: if
+the figure would have numbers on an axis, do not draw it. Nothing here can
+compute a figure, so a drawn plot is a guess dressed as a measurement. Say what
+it would show instead.
 
 ## TODO
 
