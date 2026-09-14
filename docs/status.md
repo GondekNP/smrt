@@ -41,10 +41,11 @@ not listed as verified should be assumed untested.
 | Seeding | 100 notes into a vault through the real `smrt` path; re-seed is a no-op and cannot touch a judgment |
 | **A real teaching exchange** | 2026-09-11: a model posed a quiz and an explain question through Toad, graded both, and refused to soften a rubric |
 | Tool namespacing | reaches the model as `mcp__vault-tools__quiz`; the hyphen survives |
+| Rendering, in Obsidian | 2026-09-13: inline SVG, an embedded `![[fig.svg]]`, and mermaid all render in Reading view. Only the **inline** one follows the theme — the identical file, embedded, stayed black in dark mode, because an embed is a separate document and `currentColor` cannot reach it |
 | The answer key | streams to the client in `rawInput` but Toad does not render it — the pre-commitment holds at the display layer |
 | `vault-tools` | serves MCP through the wrapper on `PATH`, spawned as a client spawns it |
-| Proxy tests | 47/47, in the image (Python 3.14) and on the host (3.10) |
-| Tool tests | 129/129, in the image (the MCP SDK is not a host dependency) |
+| Proxy tests | 72/72, in the image (Python 3.14) and on the host (3.10) |
+| Tool tests | 159/159, in the image (the MCP SDK is not a host dependency) |
 | shellcheck | zero errors across `bin/smrt`, `scripts/`, `docker/` |
 
 The read-only enforcement is the claim the project rests on, and it survived

@@ -50,8 +50,17 @@ More than about 5–7 elements means cut first.
 
 ## SVG, and the two ways it silently breaks
 
-Write it inline in your message. It flows into the session log untouched and
-renders there.
+**Write it inline in your message**, not as a file in `attachments/`. It flows
+into the session log untouched and renders there, so one file stays the whole
+record and the drawing diffs in git.
+
+Inline is also the only form that follows the reader's theme. Measured in
+Obsidian on 2026-09-13: an inline `<svg>` inverts correctly in dark mode, and
+the **identical** file embedded as `![[fig.svg]]` stayed black on black. An
+embed is an `<img>` — a separate document, which the note's colours cannot
+reach into, so `currentColor` inside it resolves to plain black. A drawing that
+must live in a file needs explicit colours that read on both themes; it cannot
+inherit them.
 
 **1. It fails without erroring.** Overlapping labels, a line off the canvas, an
 arrow pointing at nothing — all render happily and all are wrong. Mermaid has
@@ -76,6 +85,8 @@ dark background, and the theme is the reader's choice, not yours.
 - For a filled region, `fill="currentColor"` with `opacity="0.12"`.
 - When you need a genuine accent colour, pick one that reads on both — a mid
   orange or teal — and use it for **one** thing.
+- All of which works **inline only**, per the measurement above. `currentColor`
+  in an embedded file is black, whatever the theme.
 
 Three more conventions, all about not breaking the page:
 
