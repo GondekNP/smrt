@@ -127,12 +127,20 @@ def _rubric_sha256(rubric: list[str]) -> str:
     return hashlib.sha256("\n".join(rubric).encode("utf-8")).hexdigest()
 
 
+#: Appended to every quiz by the tool rather than left to the agent to
+#: remember. "I don't remember" is the most likely answer during a probe --
+#: finding the floor is what probing is *for* -- and without somewhere to put
+#: it the answer falls outside the tool and the question leaves no record.
+DONT_KNOW = "I don't know."
+
+
 @dataclass
 class _PosedQuiz:
     prompt: str
     option_ids: list[str]
     correct_option_id: str
     explanation: str
+    dont_know_id: str = ""
     answered: bool = False
     #: Displayed label -> the id the agent authored. Kept so the explanation,
     #: which may refer to the authored ids, stays readable after shuffling.
@@ -200,12 +208,29 @@ class QuizResult:
     it distinguishes a correct answer from a correct answer held for the
     right reason, which plain multiple choice cannot see at all.
 
-    Five outcomes:
-      right / sound       -> solid, advance
-      right / not sound   -> lucky guess. the most valuable signal here.
-      wrong / sound       -> a slip. the pick and the reasoning disagree.
-      wrong / coherent    -> a specific, nameable misconception
-      wrong / incoherent  -> genuine gap, back up a level
+    Eight outcomes, over three pick states:
+      right   / sound       -> solid, advance
+      right   / not sound   -> lucky guess. the most valuable signal here.
+      wrong   / sound       -> a slip. the pick and the reasoning disagree.
+      wrong   / coherent    -> a specific, nameable misconception
+      wrong   / incoherent  -> genuine gap, back up a level
+      unknown / sound       -> unsure. they knew it and would not commit.
+      unknown / coherent    -> partial. fragments, not assembled.
+      unknown / incoherent  -> the floor for this strand. stop probing down.
+
+    `pick_correct` stays a boolean and is False for "I don't know", because
+    the pick was not correct. The diagnosis is where the three states are
+    distinguished; do not read `pick_correct` as "wrong".
+
+    The three `unknown` rows were added on 2026-09-13 after a probe session in
+    which five of ten questions were answered "I don't remember" — and none of
+    them produced a grading call at all, because there was nowhere to put that
+    answer. Eight posed questions left no record of having been asked.
+
+    They are three rows rather than one because those answers differed:
+    "I don't remember, really" is a floor, while "I remember only that the
+    eigenvectors are the fundamental of the system" is fragments that have not
+    been assembled, and the right next move is not the same.
 
     `slip` was added on 2026-09-11 after the first live session produced it
     immediately. The learner described the correct option accurately and then
@@ -233,8 +258,39 @@ _LUCKY = (
     "idea from another angle before advancing.",
 )
 
-_OUTCOMES: dict[tuple[bool, str], tuple[str, str]] = {
-    (True, "sound"): (
+# Three pick states, not two. A learner who says "I don't remember" has told
+# you something specific and useful, and it is neither a right answer nor a
+# wrong one -- treating it as wrong would score the probe as a misconception
+# and send the lesson looking for a belief that is not there.
+#
+# Added 2026-09-13, after a probe session where five of ten questions were
+# answered "I don't remember" and none of them produced a grading call at all.
+# Eight posed questions left no record of having been asked. Borrowed from
+# `amosblomqvist/learn`, whose quiz UI carries an "I don't know" option on
+# every question.
+PickState = Literal["right", "wrong", "unknown"]
+
+_OUTCOMES: dict[tuple[str, str], tuple[str, str]] = {
+    ("unknown", "sound"): (
+        "unsure",
+        "They described it correctly and then declined to commit. The gap is "
+        "confidence, not knowledge — say so plainly, and ask them to commit "
+        "next time rather than re-teaching what they just demonstrated.",
+    ),
+    ("unknown", "coherent"): (
+        "partial",
+        "Fragments that have not been assembled. Probe adjacent rather than "
+        "below: the pieces are present and the connection between them is "
+        "what is missing.",
+    ),
+    ("unknown", "incoherent"): (
+        "floor",
+        "The floor for this strand, which is what probing is for. Stop "
+        "probing downward here, record it, and build from underneath. Do not "
+        "teach it now — probing measures, and a probe that teaches "
+        "contaminates what it is measuring.",
+    ),
+    ("right", "sound"): (
         "solid",
         "Advance.",
     ),
@@ -242,22 +298,22 @@ _OUTCOMES: dict[tuple[bool, str], tuple[str, str]] = {
     # pure guess are both "right for the wrong reasons". Kept as one outcome
     # because the documented table has one, and the verdict is preserved on
     # the result if the distinction ever earns its own cell.
-    (True, "coherent"): _LUCKY,
-    (True, "incoherent"): _LUCKY,
-    (False, "sound"): (
+    ("right", "coherent"): _LUCKY,
+    ("right", "incoherent"): _LUCKY,
+    ("wrong", "sound"): (
         "slip",
         "A slip, not a gap: the reasoning was right and the pick was not. "
         "Show the learner the mismatch between their own words and their "
         "choice — do not re-teach the concept, and do not back up a level. "
         "Then move on, or re-ask this one later to confirm.",
     ),
-    (False, "coherent"): (
+    ("wrong", "coherent"): (
         "misconception",
         "A specific, nameable misconception rather than an absence. Name it, "
         "then probe its extent — misconceptions generalize, so it is likely "
         "affecting neighbouring nodes too.",
     ),
-    (False, "incoherent"): (
+    ("wrong", "incoherent"): (
         "gap",
         "A genuine gap, not a misconception. Back up a level rather than "
         "re-explaining this one.",
@@ -335,7 +391,7 @@ _RNG = random.Random()
 
 def _shuffle(
     options: list[QuizOption], correct_option_id: str, requested: bool
-) -> tuple[list[QuizOption], dict[str, str], str]:
+) -> tuple[list[QuizOption], dict[str, str], str, str]:
     """Reorder the options and relabel them A, B, C… by position.
 
     Two problems, one fix. A model writing four options has habits about where
@@ -348,7 +404,8 @@ def _shuffle(
     which reads as a bug. So the displayed labels are always A, B, C… in the
     order shown, and `authored` keeps the mapping back for the record.
 
-    Returns (what to show, displayed label -> authored id, the correct label).
+    Returns (what to show, displayed label -> authored id, the correct label,
+    the "I don't know" label).
     """
     order = list(options)
     if requested and _SHUFFLE:
@@ -360,7 +417,12 @@ def _shuffle(
         label for label, original in authored.items()
         if original == correct_option_id
     )
-    return shown, authored, correct_label
+    # Always last, never shuffled, and added here rather than asked of the
+    # agent: an affordance that depends on being remembered is one that goes
+    # missing in the session where it matters most.
+    dont_know_label = chr(ord("A") + len(order))
+    shown.append(QuizOption(id=dont_know_label, text=DONT_KNOW))
+    return shown, authored, correct_label, dont_know_label
 
 
 def _lint_options(options: list[QuizOption], correct_option_id: str) -> list[str]:
@@ -464,13 +526,15 @@ def quiz(
             "the others were written to match it."
         )
 
-    shown, authored, correct_label = _shuffle(options, correct_option_id, shuffle)
+    shown, authored, correct_label, dont_know = _shuffle(
+        options, correct_option_id, shuffle)
 
     question_id = _new_id("quiz")
     _QUIZZES[question_id] = _PosedQuiz(
         prompt=prompt,
         option_ids=[o.id for o in shown],
         correct_option_id=correct_label,
+        dont_know_id=dont_know,
         explanation=explanation,
         authored=authored,
     )
@@ -550,8 +614,14 @@ def answer_quiz(
         )
 
     posed.answered = True
-    pick_correct = pick == posed.correct_option_id
-    diagnosis, next_step = _OUTCOMES[(pick_correct, reason_verdict)]
+    if posed.dont_know_id and pick == posed.dont_know_id:
+        state: str = "unknown"
+    elif pick == posed.correct_option_id:
+        state = "right"
+    else:
+        state = "wrong"
+    pick_correct = state == "right"
+    diagnosis, next_step = _OUTCOMES[(state, reason_verdict)]
     return QuizResult(
         pick_correct=pick_correct,
         reason_verdict=reason_verdict,

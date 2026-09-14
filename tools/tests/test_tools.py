@@ -565,12 +565,15 @@ class TestShuffle(unittest.TestCase):
         """Reordering while keeping the authored ids would show the learner
         "C" first, which reads as a bug."""
         posed = self.pose()
-        self.assertEqual([o.id for o in posed.options], ["A", "B", "C", "D"])
+        # Five: the four authored, plus the appended "I don't know".
+        self.assertEqual([o.id for o in posed.options],
+                         ["A", "B", "C", "D", "E"])
 
     def test_the_texts_are_preserved_exactly(self) -> None:
         posed = self.pose()
         self.assertEqual(sorted(o.text for o in posed.options),
-                         ["claim 1", "claim 2", "claim 3", "claim 4"])
+                         ["I don't know.", "claim 1", "claim 2",
+                          "claim 3", "claim 4"])
 
     def test_the_key_follows_the_option_it_belongs_to(self) -> None:
         """The whole thing is wrong if the answer stays at a fixed label."""
@@ -608,7 +611,8 @@ class TestShuffle(unittest.TestCase):
         sequence, magnitudes to rank."""
         posed = self.pose(shuffle=False)
         self.assertEqual([o.text for o in posed.options],
-                         ["claim 1", "claim 2", "claim 3", "claim 4"])
+                         ["claim 1", "claim 2", "claim 3", "claim 4",
+                          server.DONT_KNOW])
         self.assertEqual(server._QUIZZES[posed.question_id].correct_option_id,
                          "A")
 
@@ -618,3 +622,85 @@ class TestShuffle(unittest.TestCase):
         authored = server._QUIZZES[posed.question_id].authored
         self.assertEqual(sorted(authored), ["A", "B", "C", "D"])
         self.assertEqual(sorted(authored.values()), ["1", "2", "3", "4"])
+
+
+class TestIDontKnow(unittest.TestCase):
+    """Five of ten probes in the 2026-09-13 session were answered "I don't
+    remember", and not one produced a grading call — there was nowhere to put
+    that answer, so eight posed questions left no record of being asked.
+
+    Finding the floor is what probing is *for*, so the most likely answer
+    during a probe was the one the tool could not represent.
+    """
+
+    OPTIONS = [QuizOption(id=str(i), text=f"claim {i}") for i in range(1, 4)]
+
+    def pose(self, **over):
+        kwargs = dict(prompt="Which one?", options=self.OPTIONS,
+                      correct_option_id="1", explanation="Because.",
+                      shuffle=False)
+        kwargs.update(over)
+        return quiz(**kwargs)
+
+    def test_every_quiz_offers_it_without_being_asked(self) -> None:
+        """An affordance that depends on being remembered goes missing in the
+        session where it matters most."""
+        self.assertEqual(self.pose().options[-1].text, server.DONT_KNOW)
+
+    def test_it_is_always_last_even_when_shuffled(self) -> None:
+        for _ in range(20):
+            self.assertEqual(self.pose(shuffle=True).options[-1].text,
+                             server.DONT_KNOW)
+
+    def test_it_is_never_the_correct_answer(self) -> None:
+        posed = self.pose()
+        record = server._QUIZZES[posed.question_id]
+        self.assertNotEqual(record.correct_option_id, record.dont_know_id)
+
+    def test_declining_is_not_graded_as_wrong(self) -> None:
+        """Scoring it wrong would send the lesson hunting for a misconception
+        that is not there."""
+        posed = self.pose()
+        result = answer_quiz(
+            posed.question_id, pick=posed.options[-1].id,
+            reason="I don't remember what eigenvalues mean",
+            reason_verdict="incoherent")
+        self.assertFalse(result.pick_correct)
+        self.assertEqual(result.diagnosis, "floor")
+        self.assertNotIn("misconception", result.next_step)
+
+    def test_fragments_are_distinguished_from_a_floor(self) -> None:
+        """"I remember only that eigenvectors are the fundamental of the
+        system" is not the same answer as "I don't remember, really", and the
+        next move is not the same either."""
+        posed = self.pose()
+        result = answer_quiz(posed.question_id, pick=posed.options[-1].id,
+                             reason="something about a fundamental direction",
+                             reason_verdict="coherent")
+        self.assertEqual(result.diagnosis, "partial")
+
+    def test_knowing_it_but_not_committing_is_its_own_outcome(self) -> None:
+        posed = self.pose()
+        result = answer_quiz(posed.question_id, pick=posed.options[-1].id,
+                             reason="repeated application only rescales it",
+                             reason_verdict="sound")
+        self.assertEqual(result.diagnosis, "unsure")
+        self.assertIn("confidence", result.next_step)
+
+    def test_a_reason_is_still_required(self) -> None:
+        """What they *do* half-remember is the useful part of a don't-know."""
+        posed = self.pose()
+        with self.assertRaises(ToolError):
+            answer_quiz(posed.question_id, pick=posed.options[-1].id,
+                        reason="   ", reason_verdict="incoherent")
+
+    def test_the_three_unknown_rows_are_all_reachable(self) -> None:
+        for verdict, expected in (("sound", "unsure"),
+                                  ("coherent", "partial"),
+                                  ("incoherent", "floor")):
+            with self.subTest(verdict=verdict):
+                posed = self.pose()
+                self.assertEqual(
+                    answer_quiz(posed.question_id, pick=posed.options[-1].id,
+                                reason="r", reason_verdict=verdict).diagnosis,
+                    expected)
