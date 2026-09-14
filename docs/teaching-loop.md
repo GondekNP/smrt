@@ -90,6 +90,29 @@ tool's job and it already knows the pick:
 | wrong | `sound` | **A slip.** The reasoning was right and the pick was not. Show the mismatch; do not re-teach, and do not back up. |
 | wrong | `coherent` | A specific, nameable misconception. Dig into its extent. |
 | wrong | `incoherent` | Genuine gap, not a misconception. Back up a level. |
+| **"I don't know"** | `sound` | **Unsure.** They described it correctly and would not commit. Confidence, not knowledge. |
+| **"I don't know"** | `coherent` | **Partial.** Fragments not yet assembled. Probe sideways, not down. |
+| **"I don't know"** | `incoherent` | **The floor.** What probing is for. Stop descending, build from underneath. |
+
+**"I don't know" is a third pick state, not a wrong answer**, and the tool
+appends it to every quiz rather than trusting the agent to offer it. Added
+2026-09-13 after a probe session answered five of ten questions "I don't
+remember" and produced **no grading call for any of them** — there was nowhere
+to put that answer, so eight posed questions left no record of having been
+asked. Finding the floor is what probing is for, so the likeliest answer during
+a probe was the one the tool could not represent.
+
+Three rows rather than one because those answers genuinely differ: *"I don't
+remember, really"* is a floor, while *"I remember only that the eigenvectors are
+the fundamental of the system"* is fragments waiting to be joined, and the next
+move is not the same.
+
+**Every grade is said out loud to the learner.** In that same session the first
+probe graded `lucky_guess` and the agent silently re-probed from another angle —
+correct behaviour, invisible to the learner, who believed they had it right. The
+most valuable signal these tools produce reached nobody. Say the diagnosis, not
+the `next_step`: the latter is stage direction for the agent and reads as being
+managed.
 
 **`slip` was added on 2026-09-11, and the first live session produced it
 immediately** — which is the argument for having run one. The learner

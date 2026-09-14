@@ -106,8 +106,38 @@ measures nothing. Ask instead for what a pick alone cannot show:
 - *"One line: what rule are you applying?"*
 - *"One line: what would have to be true for B to be right instead?"*
 
-See `docs/teaching-loop.md` for distractor construction and the five-outcome
+See `docs/teaching-loop.md` for distractor construction and the eight-outcome
 diagnosis table.
+
+## Say the diagnosis out loud
+
+**Every grade is told to the learner, in one line, before you move on.**
+
+Measured, not hypothetical: in the 2026-09-13 session the first probe graded
+`lucky_guess` — right pick, hollow reasoning — and the agent silently did the
+right thing, re-probing the same idea from another angle. The learner had no
+idea. They believed they had got it right and were being advanced; they were
+actually being re-tested. `lucky_guess` is the single most valuable signal
+these tools produce and it reached nobody.
+
+Say the diagnosis, not the stage direction. `next_step` is instruction for
+you — "escalate sharply", "back off" — and reads as being managed. The
+diagnosis is information about *them*:
+
+| Grade | Something like |
+|---|---|
+| `solid` | "Right, and for the right reason. Going up a level." |
+| `lucky_guess` | "Right pick — but that reasoning doesn't get you there. Same idea, different angle." |
+| `slip` | "Your reasoning was right and the letter wasn't. Reading the two side by side: …" |
+| `misconception` | "There's a specific wrong belief here worth naming: …" |
+| `gap` | "That one's below where we are. Backing up." |
+| `unsure` | "You just described it correctly and then didn't back yourself. That's confidence, not knowledge." |
+| `partial` | "The pieces are there, the join isn't." |
+| `floor` | "Good — that's the floor, which is what I was looking for. Building up from underneath." |
+
+**A floor is a finding, not a failure.** Probing exists to locate it, so
+receiving several in a row means the probe is working. Say so, or a learner
+answering "I don't know" five times reasonably concludes they are failing.
 
 ## Probing is adaptive, and only one cell licenses a jump
 
@@ -122,6 +152,19 @@ hollow, and escalating on it overshoots the real edge.
 | `slip` | same level, re-ask. The level was fine, the click was not |
 | `misconception` | narrow in around it |
 | `gap` | back off |
+| `unsure` | treat as `solid` for level, and ask them to commit next time |
+| `partial` | sideways, not down — the pieces are there and the join is not |
+| `floor` | stop descending this strand. It is located |
+
+**"I don't know" is an option on every quiz**, appended by the tool, always
+last. Grade it like any other answer — pass their words as `reason` and judge
+them on their own. Three of the eight outcomes exist only for it, and the
+difference between them is real: "I don't remember, really" is a floor, while
+"I remember only that eigenvectors are the fundamental of the system" is
+fragments waiting to be joined.
+
+Never let a declined question go ungraded. An ungraded question is one the
+vault has no record of having been asked.
 
 Done when the edge is **bracketed** per strand: a `solid` below and a `gap` or
 `misconception` above. Roughly ten questions is a safety valve, not a target.
