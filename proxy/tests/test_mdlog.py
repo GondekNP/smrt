@@ -125,11 +125,19 @@ class TestTheAnswerIsNeverSpoiled(Base):
                         after.index("observed Fisher information"))
 
     def test_the_rubric_is_withheld_at_posing(self) -> None:
+        """The count, never the items. That there are three things to cover is
+        part of the question; what they are is the answer."""
         self.feed(completed("t1", EXPLAIN_OUTPUT))
         written = self.log.path.read_text(encoding="utf-8")
-        self.assertIn("Why does inverting the Hessian", written)
-        self.assertIn("3 things", written)
+        self.assertIn("Rubric committed: 3 items", written)
         self.assertNotIn("the score has mean zero", written)
+
+    def test_the_explain_question_is_not_restated(self) -> None:
+        """A tool call cannot ask anyone anything, so the question was posed in
+        prose and is already in the file above this block."""
+        self.feed(completed("t1", EXPLAIN_OUTPUT))
+        self.assertNotIn("Why does inverting the Hessian",
+                         self.log.path.read_text(encoding="utf-8"))
 
     def test_the_rubric_is_written_once_graded(self) -> None:
         """Plaintext only now, so it can be checked against the committed
@@ -234,3 +242,74 @@ class TestWhereItGoes(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestFramesAsTheyReallyArrive(Base):
+    """Shapes measured on the wire, not assumed.
+
+    `claude-agent-acp` sends an MCP tool's structured output as a JSON
+    *string* and `rawInput` as null. The first version of this module required
+    a dict, matched nothing, and silently wrote a whole session with no
+    questions and no grades in it — while looking like it worked, because the
+    agent's own prose was still being mirrored.
+    """
+
+    @staticmethod
+    def as_string(call_id: str, payload: dict) -> dict:
+        import json
+        return update(sessionUpdate="tool_call_update", toolCallId=call_id,
+                      status="completed", rawInput=None,
+                      rawOutput=json.dumps(payload))
+
+    def test_a_json_string_payload_is_read(self) -> None:
+        self.feed(self.as_string("t1", QUIZ_RESULT))
+        self.assertIn("misconception", self.read())
+
+    def test_content_blocks_are_unwrapped(self) -> None:
+        import json
+        self.feed(update(sessionUpdate="tool_call_update", toolCallId="t1",
+                         status="completed",
+                         rawOutput=[{"type": "text",
+                                     "text": json.dumps(QUIZ_RESULT)}]))
+        self.assertIn("misconception", self.read())
+
+    def test_a_string_that_is_not_json_is_ignored(self) -> None:
+        self.feed(update(sessionUpdate="tool_call_update", toolCallId="t1",
+                         status="completed", rawOutput="README.md\nnotes\n"))
+        self.assertNotIn("README", self.read())
+
+
+class TestItDoesNotDuplicateTheQuestion(Base):
+    """The agent must pose the question in prose — a tool call cannot ask
+    anyone anything — so the tool's copy underneath would show it twice, in
+    plainer notation than the version actually read."""
+
+    POSED = ("Which converges?\n\n- **A.** The first one.\n"
+             "- **B.** The second one.\n")
+
+    def test_the_block_is_skipped_when_prose_already_posed_it(self) -> None:
+        self.feed(text(self.POSED), completed("t1", QUIZ_OUTPUT))
+        written = self.read()
+        self.assertEqual(written.count("The maximized LL value itself."), 0)
+        self.assertIn("- **A.** The first one.", written)
+
+    def test_the_block_is_written_when_prose_did_not(self) -> None:
+        """The fallback, and also the tell that the skill's format slipped."""
+        self.feed(text("Here is a question for you."),
+                  completed("t1", QUIZ_OUTPUT))
+        self.assertIn("- **A.** The maximized LL value itself.", self.read())
+
+
+class TestMessagesDoNotRunTogether(Base):
+    """Two agent messages either side of a tool call were written as one
+    paragraph, which is how `…not teaching yet.**Probe 1**…` happened."""
+
+    def test_a_tool_call_ends_the_message_before_it(self) -> None:
+        self.feed(text("First message."),
+                  update(sessionUpdate="tool_call", toolCallId="t9",
+                         status="pending", rawInput={"command": "ls"}),
+                  text("Second message."))
+        written = self.read()
+        self.assertNotIn("First message.Second message.", written)
+        self.assertIn("First message.", written)
+        self.assertIn("Second message.", written)

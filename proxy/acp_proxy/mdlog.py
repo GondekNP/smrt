@@ -30,7 +30,9 @@ entry point swallows its own exceptions and records the failure in the trace.
 
 from __future__ import annotations
 
+import json
 import os
+import re
 import threading
 from datetime import datetime
 from pathlib import Path
@@ -44,6 +46,15 @@ _WITHHELD = frozenset({
     "correct_option_id", "explanation",     # quiz
     "rubric",                               # explain
 })
+
+# The option list the teach skill is required to write: `- **A.** …`. Its
+# presence just before a quiz call means the agent already posed the question
+# in prose, where it is rendered in the learner's own notation. Writing the
+# tool's copy underneath would show every question twice.
+_POSED_IN_PROSE = re.compile(r"^\s*[-*]\s*\*\*A[.):]", re.MULTILINE)
+
+# How much recent output to keep for that check. One exchange, not a session.
+_RECENT = 3000
 
 
 def default_dir() -> Path | None:
@@ -74,6 +85,8 @@ class MdLog:
         # Tool call ids already written. `tool_call` and `tool_call_update`
         # can both carry a completed result for the same call.
         self._seen: set[str] = set()
+        # Tail of what has been written, for the duplicate check above.
+        self._recent = ""
         if directory is None:
             return
         try:
@@ -112,6 +125,7 @@ class MdLog:
         try:
             with self._lock:
                 self._append(text)
+                self._recent = (self._recent + text)[-_RECENT:]
         except Exception as error:  # noqa: BLE001
             self._note("md_log_failed", error=str(error))
 
@@ -157,6 +171,35 @@ class MdLog:
         if kind in ("tool_call", "tool_call_update"):
             self._tool(update)
 
+    @staticmethod
+    def _payload(raw: object) -> dict | None:
+        """A tool's structured result, whatever shape the adapter wrapped it in.
+
+        Measured against `claude-agent-acp`, which sends an MCP tool's output
+        as a **JSON string** rather than an object -- and `rawInput` as null.
+        The first version of this module required a dict, so it matched
+        nothing and silently wrote no questions and no grades at all for a
+        whole session. `compat.py` has already recorded lists arriving here
+        too, so both are handled.
+        """
+        if isinstance(raw, dict):
+            return raw
+        if isinstance(raw, list):
+            # MCP content blocks: [{"type": "text", "text": "{...}"}]
+            for block in raw:
+                if isinstance(block, dict) and isinstance(block.get("text"), str):
+                    found = MdLog._payload(block["text"])
+                    if found is not None:
+                        return found
+            return None
+        if isinstance(raw, str):
+            try:
+                parsed = json.loads(raw)
+            except (ValueError, TypeError):
+                return None
+            return parsed if isinstance(parsed, dict) else None
+        return None
+
     def _tool(self, update: dict) -> None:
         """Write from the tool's OUTPUT, never its input.
 
@@ -167,18 +210,26 @@ class MdLog:
         is both safer and more accurate, and this module never has to strip
         anything -- it simply never holds the key.
         """
+        # Any tool call ends the message that preceded it, whether or not it
+        # is one worth mirroring. Without this, two agent messages either side
+        # of a `Read` are written as one run-on paragraph.
+        self._flush()
         if update.get("status") != "completed":
             return
         call_id = str(update.get("toolCallId") or "")
         if call_id and call_id in self._seen:
             return
-        out = update.get("rawOutput")
-        if not isinstance(out, dict):
+        out = self._payload(update.get("rawOutput"))
+        if out is None:
             return
 
         block = ""
         if "options" in out and "question_id" in out:
-            block = self._quiz_block(out)
+            # Only as a fallback. If the agent posed it properly in prose, its
+            # version is the one the learner actually read -- and the one with
+            # the maths typeset.
+            block = "" if _POSED_IN_PROSE.search(self._recent) else \
+                self._quiz_block(out)
         elif "rubric_items" in out and "question" in out:
             block = self._explain_block(out)
         elif "diagnosis" in out:
@@ -238,20 +289,31 @@ class MdLog:
 
     @staticmethod
     def _explain_block(out: dict) -> str:
-        lines = ["\n### Explain\n", f"\n{out.get('question', '')}\n"]
+        """Only what the prose will not have said.
+
+        The question itself is posed in the conversation -- a tool call cannot
+        ask anyone anything -- so restating it here would duplicate it. What
+        the prose has no reason to carry is the shape of the commitment: how
+        many rubric items were fixed before the question was shown, and which
+        vocabulary is already being counted against.
+        """
+        lines = ["\n*"]
         count = out.get("rubric_items")
         if count:
             # The number of rubric items, never the items. Knowing there are
             # three things to cover is part of the question; knowing what they
             # are is the answer.
-            lines.append(f"\n*{count} things a full answer must contain.*\n")
+            lines.append(f"Rubric committed: {count} items.")
         vocab = out.get("vocabulary")
         if isinstance(vocab, list) and vocab:
             named = ", ".join(
                 f"`{v.get('name')}` ({v.get('tier')})"
                 for v in vocab if isinstance(v, dict)
             )
-            lines.append(f"\n*Vocabulary: {named}*\n")
+            lines.append(f" Vocabulary: {named}.")
+        if len(lines) == 1:
+            return ""
+        lines.append("*\n")
         return "".join(lines)
 
     @staticmethod
