@@ -109,6 +109,22 @@ measures nothing. Ask instead for what a pick alone cannot show:
 See `docs/teaching-loop.md` for distractor construction and the eight-outcome
 diagnosis table.
 
+## Never name an option by its letter
+
+**In the explanation, and in the prose afterwards, refer to each option by
+what it says** — "the 'identically zero' option", not "C".
+
+The options are **shuffled before the learner sees them**, and the explanation
+is committed before that happens. A letter you write names your own authoring
+order, not theirs. Measured 2026-09-15: an explanation said "C is wrong: there
+is no alphabetical-drop rule" about the option the learner had just correctly
+picked, because the correct answer had been authored first and shown third.
+
+The tool refuses a lettered explanation. Nothing can catch it in your prose, so
+the discipline is yours there. Naming the claim reads better anyway — the
+reader does not have to hold a letter-to-claim mapping in their head to follow
+the argument.
+
 ## Do not narrate the plumbing
 
 The session log is what the learner reads back. **Sentences about your own

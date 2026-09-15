@@ -348,6 +348,39 @@ _APPOSITIVE = re.compile(r"\s[—–]\s|\s--\s")
 _APPOSITIVE_WORDS = 6
 
 
+# References to an option by LETTER, which the explanation cannot legally make.
+#
+# The explanation is committed at posing time, before `_shuffle` assigns the
+# A-E labels, so any letter in it names the agent's own authoring order. It is
+# not a mistake the author can avoid by being careful: at the moment of
+# writing, the labels the learner will see do not exist yet.
+#
+# Measured 2026-09-15. Authored opt1 "identically zero" (the correct one),
+# opt2 "linear combination", opt3 "alphabetical", opt4 "no intercept". Shown
+# to the learner as A alphabetical, B no intercept, C identically zero, D
+# linear combination. The explanation then read "C is wrong: there is no
+# alphabetical-drop rule" -- about the option the learner had just correctly
+# chosen. Every letter in it was wrong for its reader.
+_OPTION_LETTER = re.compile(r"""(?xi)
+      \boption \s* \(? [a-e] \)? (?![a-z])
+    | \( \s* [a-e] \s* \) \s+ (?=\w)
+    | \b [a-e] \s+ (?: is | are | was | were ) \s+
+        (?: wrong | right | correct | incorrect | true | false
+          | the \b | a \b | an \b | not \b )
+""")
+
+
+def _by_letter(explanation: str, options: list[QuizOption]) -> list[str]:
+    """Option references the learner cannot resolve. Refused, not warned."""
+    found = [m.group(0).strip() for m in _OPTION_LETTER.finditer(explanation)]
+    # Authored ids too, when they are distinctive enough to match on purpose.
+    # A one- or two-character id is a substring of everything.
+    for option in options:
+        if len(option.id) > 2 and option.id in explanation:
+            found.append(option.id)
+    return sorted(set(found))
+
+
 def _leaking(options: list[QuizOption]) -> list[str]:
     """Options carrying their own reasoning. Structural, so it is refused.
 
@@ -524,6 +557,21 @@ def quiz(
             "`explanation`, which the learner sees only after answering. "
             "Regenerate the whole set rather than trimming the offender — "
             "the others were written to match it."
+        )
+
+    lettered = _by_letter(explanation, options)
+    if lettered:
+        raise ToolError(
+            "the explanation refers to options by letter (" +
+            ", ".join(repr(x) for x in lettered) + "), and those letters are "
+            "assigned after this call — the options are shuffled before the "
+            "learner sees them, so your ordering is not theirs. A letter here "
+            "names a different option for the reader, including, in the case "
+            "already observed, calling the correct answer wrong. "
+            "Name each option by what it says instead: "
+            "\"the 'identically zero' option is wrong because ...\". "
+            "That also reads better, since the reader does not have to hold a "
+            "letter-to-claim mapping in their head."
         )
 
     shown, authored, correct_label, dont_know = _shuffle(

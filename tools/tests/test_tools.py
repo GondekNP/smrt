@@ -704,3 +704,68 @@ class TestIDontKnow(unittest.TestCase):
                     answer_quiz(posed.question_id, pick=posed.options[-1].id,
                                 reason="r", reason_verdict=verdict).diagnosis,
                     expected)
+
+
+class TestOptionsAreNamedNotLettered(unittest.TestCase):
+    """An explanation may not refer to an option by letter.
+
+    It is committed at posing time, before `_shuffle` assigns A-E, so a letter
+    in it names the agent's own authoring order rather than the learner's.
+    This is not carelessness to be coached out: at the moment of writing, the
+    labels the reader will see do not exist.
+
+    Measured 2026-09-15. Authored opt1 "identically zero" (correct), opt2
+    "linear combination", opt3 "alphabetical", opt4 "no intercept"; shown as
+    A alphabetical, B no intercept, C identically zero, D linear combination.
+    The explanation then read "C is wrong: there is no alphabetical-drop
+    rule" -- about the option the learner had just correctly picked."""
+
+    def options(self):
+        return [server.QuizOption(id="opt1", text="Identically zero."),
+                server.QuizOption(id="opt2", text="A linear combination."),
+                server.QuizOption(id="opt3", text="Sorted alphabetically."),
+                server.QuizOption(id="opt4", text="No intercept.")]
+
+    def pose(self, explanation: str):
+        return server.quiz(prompt="Why is it NA?", options=self.options(),
+                           correct_option_id="opt1", explanation=explanation)
+
+    def test_the_real_explanation_is_refused(self) -> None:
+        with self.assertRaises(ToolError) as caught:
+            self.pose("B is wrong because the columns are indicators. "
+                      "C is wrong: there is no alphabetical-drop rule.")
+        self.assertIn("by letter", str(caught.exception))
+
+    def test_the_parenthesised_form_is_refused(self) -> None:
+        """From the first live probe: "Option (a) swaps pop3 with ..."."""
+        with self.assertRaises(ToolError) as caught:
+            self.pose("Option (a) swaps the two terms, and option (c) "
+                      "confuses a difference with an absolute value.")
+        self.assertIn("by letter", str(caught.exception))
+
+    def test_an_authored_id_is_refused_when_distinctive(self) -> None:
+        with self.assertRaises(ToolError):
+            self.pose("opt1 is right because the column is zero everywhere.")
+
+    def test_naming_the_claim_passes(self) -> None:
+        """The form actually wanted, and the one that reads better: the reader
+        does not have to hold a letter-to-claim mapping in their head."""
+        posed = self.pose(
+            "The 'identically zero' option is right: no row has that cell. "
+            "The 'linear combination' claim would hold in the effects "
+            "parameterization, not this one.")
+        self.assertTrue(posed.question_id)
+
+    def test_articles_are_not_option_references(self) -> None:
+        """The trap in any bare-letter rule. These must all survive."""
+        posed = self.pose(
+            "A vector of ones codes the intercept. A row of the design matrix "
+            "is one observation. A design matrix column is an indicator, and "
+            "the answer is a linear combination, which is why lm() reports NA.")
+        self.assertTrue(posed.question_id)
+
+    def test_prose_about_rows_and_values_survives(self) -> None:
+        posed = self.pose(
+            "On row 5: reg2=1, hab2=1, hab3=0, so reg2:hab2=1. The claim that "
+            "both are identically zero is wrong, since reg2:hab2 is 1 there.")
+        self.assertTrue(posed.question_id)
