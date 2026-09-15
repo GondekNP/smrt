@@ -41,13 +41,16 @@ not listed as verified should be assumed untested.
 | Seeding | 100 notes into a vault through the real `smrt` path; re-seed is a no-op and cannot touch a judgment |
 | **A real teaching exchange** | 2026-09-11: a model posed a quiz and an explain question through Toad, graded both, and refused to soften a rubric |
 | Tool namespacing | reaches the model as `mcp__vault-tools__quiz`; the hyphen survives |
+| Text-anchored crops | 2026-09-15: `snip ASM/3.4 99 --from … --to …` produced a crop carrying all six design-matrix rows, the coefficient block and the matrix notation, with clean edges — the same page an eyeballed box had cut in half twice |
+| Shell variables defeat allow rules | measured, not reasoned: the `$SUBJECT_ROOT` form of a `pdftoppm` command was denied and wrote no file; the literal `/subject/…` form ran. Commands now print literal paths |
+| The question is written once | the real 427-frame session replayed through the fixed mirror: `### Quiz` 0, `#### Graded` 0, Q4 and Q5 each posed exactly once, grade folded into `<details>` |
 | Permission rules | 2026-09-15, under `--permission-prompts none` (which denies anything that would prompt): a `touch` into `/vault` was denied and the file not created, while `pdftotext` on an unapproved page range, `smrt-curriculum locate` and a `pdftoppm` write all ran |
 | Snipping a source page | 2026-09-15: `snip ASM/3.4 98 90,405,495,165` emitted the crop that cut Kéry's design matrix out of printed p. 98 — 23 KB, legible, verified against the rendered page. Its motive is measured too: the same table's R output extracts from `pdftotext` with the header/value pairing destroyed |
 | Rendering, in Obsidian | 2026-09-13: inline SVG, an embedded `![[fig.svg]]`, and mermaid all render in Reading view. Only the **inline** one follows the theme — the identical file, embedded, stayed black in dark mode, because an embed is a separate document and `currentColor` cannot reach it |
 | The answer key | streams to the client in `rawInput` but Toad does not render it — the pre-commitment holds at the display layer |
 | `vault-tools` | serves MCP through the wrapper on `PATH`, spawned as a client spawns it |
-| Proxy tests | 74/74, in the image (Python 3.14) and on the host (3.10) |
-| Tool tests | 166/166, in the image (the MCP SDK is not a host dependency) |
+| Proxy tests | 80/80, in the image (Python 3.14) and on the host (3.10) |
+| Tool tests | 174/174, in the image (the MCP SDK is not a host dependency) |
 | shellcheck | zero errors across `bin/smrt`, `scripts/`, `docker/` |
 
 The read-only enforcement is the claim the project rests on, and it survived

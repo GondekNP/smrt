@@ -14,6 +14,7 @@ from __future__ import annotations
 import re
 import tempfile
 import unittest
+import unittest.mock
 from pathlib import Path
 
 from vault_tools import curriculum
@@ -854,3 +855,82 @@ class TestSnip(unittest.TestCase):
         code, out = self.run_cli("snip", "SPLIT/2.1", "50", "10,10,50,50")
         self.assertEqual(code, 0)
         self.assertIn("outside", out)
+
+
+class TestAnchoredCrops(unittest.TestCase):
+    """Choosing a crop box by looking at a preview does not work.
+
+    Measured 2026-09-15: asked for the design matrix on p. 99, a model guessed
+    a box, saw the result was short, guessed a taller one from the same origin,
+    and still cut off rows 4-6 and clipped the first line. The page has a text
+    layer that knows where every line is, to the point."""
+
+    PAGE = [
+        # (yMin, yMax, xMin, xMax, text) in points
+        (100.0, 110.0, 50.0, 300.0, "Some earlier paragraph"),
+        (130.0, 140.0, 50.0, 280.0, "Finally, here is the means parameterization"),
+        (150.0, 160.0, 50.0, 260.0, "Coefficients:"),
+        (170.0, 180.0, 50.0, 400.0, "reg1:hab1 reg2:hab1 reg1:hab2"),
+        (190.0, 200.0, 50.0, 200.0, "[ . . . ]"),
+        (220.0, 230.0, 50.0, 300.0, "A later paragraph entirely"),
+    ]
+
+    def box(self, start: str, end: str, dpi: int = 220):
+        with unittest.mock.patch.object(curriculum, "_lines_with_boxes",
+                                        return_value=self.PAGE):
+            return curriculum.anchor_box("ignored.pdf", 1, start, end, dpi)
+
+    def test_the_box_spans_the_anchored_lines(self) -> None:
+        x, y, w, h = self.box("Finally, here is", "[ . . . ]")
+        scale = 220 / 72
+        # Top edge sits between the previous line and the first anchored one,
+        # bottom between the last anchored one and the next.
+        self.assertGreater(y, 110.0 * scale)
+        self.assertLess(y, 130.0 * scale)
+        self.assertGreater(y + h, 200.0 * scale)
+        self.assertLess(y + h, 220.0 * scale)
+
+    def test_it_does_not_eat_the_neighbouring_lines(self) -> None:
+        """A crop with a sliced-off row of text at its edge reads as a mistake
+        even when everything asked for is present."""
+        _, y, _, h = self.box("Coefficients:", "[ . . . ]")
+        scale = 220 / 72
+        self.assertGreater(y, 140.0 * scale)      # clear of the line above
+        self.assertLess(y + h, 220.0 * scale)     # clear of the line below
+
+    def test_the_match_is_case_and_whitespace_insensitive(self) -> None:
+        a = self.box("finally,   HERE is", "[ . . . ]")
+        b = self.box("Finally, here is", "[ . . . ]")
+        self.assertEqual(a, b)
+
+    def test_to_matches_the_LAST_occurrence(self) -> None:
+        """Which is why a distinctive phrase matters: `--to "1"` would run to
+        the bottom of the page rather than to the line meant."""
+        _, _, _, near = self.box("Coefficients:", "Coefficients:")
+        _, _, _, far = self.box("Coefficients:", "[ . . . ]")
+        self.assertLess(near, far)
+
+    def test_a_phrase_that_matches_nothing_is_an_error(self) -> None:
+        """Not a silent crop of whatever was nearby."""
+        with self.assertRaises(curriculum._Unresolved) as caught:
+            self.box("no such line anywhere", "[ . . . ]")
+        self.assertIn("no line", str(caught.exception))
+
+    def test_an_end_above_the_start_is_an_error(self) -> None:
+        with self.assertRaises(curriculum._Unresolved):
+            self.box("[ . . . ]", "Some earlier paragraph")
+
+    def test_a_page_with_no_text_layer_says_so(self) -> None:
+        """A scan. The whole locator path depends on a text layer, and this is
+        the one place it can be diagnosed precisely."""
+        with unittest.mock.patch.object(curriculum, "_lines_with_boxes",
+                                        return_value=[]):
+            with self.assertRaises(curriculum._Unresolved) as caught:
+                curriculum.anchor_box("scan.pdf", 1, "a", "b", 220)
+        self.assertIn("no text layer", str(caught.exception))
+
+    def test_points_convert_to_pixels_at_the_render_dpi(self) -> None:
+        """pdftoppm crops in pixels; the layout is in points. 72 to the inch."""
+        _, y_low, _, _ = self.box("Coefficients:", "[ . . . ]", dpi=72)
+        _, y_high, _, _ = self.box("Coefficients:", "[ . . . ]", dpi=144)
+        self.assertEqual(y_high, y_low * 2)

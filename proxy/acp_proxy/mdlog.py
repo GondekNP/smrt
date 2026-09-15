@@ -87,6 +87,9 @@ class MdLog:
         self._seen: set[str] = set()
         # Tail of what has been written, for the duplicate check above.
         self._recent = ""
+        # A posed question held back to see whether the agent poses it itself.
+        # Written only if nothing in the prose does, by the next user turn.
+        self._deferred = ""
         if directory is None:
             return
         try:
@@ -146,7 +149,7 @@ class MdLog:
         params = params if isinstance(params, dict) else {}
 
         if method == "session/prompt":
-            self._flush()
+            self._settle()
             self._write(self._prompt_block(params))
             return
 
@@ -213,7 +216,11 @@ class MdLog:
         # Any tool call ends the message that preceded it, whether or not it
         # is one worth mirroring. Without this, two agent messages either side
         # of a `Read` are written as one run-on paragraph.
-        self._flush()
+        #
+        # `_settle` rather than `_flush`, so a held question is written before
+        # whatever this call produces. Otherwise a grade could reach the log
+        # ahead of the question it grades.
+        self._settle()
         if update.get("status") != "completed":
             return
         call_id = str(update.get("toolCallId") or "")
@@ -225,11 +232,22 @@ class MdLog:
 
         block = ""
         if "options" in out and "question_id" in out:
-            # Only as a fallback. If the agent posed it properly in prose, its
-            # version is the one the learner actually read -- and the one with
-            # the maths typeset.
-            block = "" if _POSED_IN_PROSE.search(self._recent) else \
-                self._quiz_block(out)
+            # Only as a fallback, and DEFERRED rather than written here.
+            #
+            # If the agent poses the question properly in prose, that version
+            # is the one the learner read, with the maths typeset. Checking
+            # `_recent` alone only catches the case where the prose came
+            # first. Measured 2026-09-15: the tool call came first, the check
+            # found nothing to dedupe against, and the log carried the same
+            # question twice -- once in tool spelling, once in the agent's.
+            #
+            # So hold it. `_flush` drops it if the prose turns out to pose the
+            # question, and the next user turn writes it if nothing did.
+            if call_id:
+                self._seen.add(call_id)
+            if not _POSED_IN_PROSE.search(self._recent):
+                self._deferred = self._quiz_block(out)
+            return
         elif "rubric_items" in out and "question" in out:
             block = self._explain_block(out)
         elif "diagnosis" in out:
@@ -250,11 +268,21 @@ class MdLog:
         text = "".join(self._pending).strip()
         self._pending.clear()
         if text:
+            if self._deferred and _POSED_IN_PROSE.search(text):
+                # The agent posed it itself. Its version wins.
+                self._deferred = ""
             self._write(f"\n{text}\n")
+
+    def _settle(self) -> None:
+        """Write a held question that the prose never got around to posing."""
+        self._flush()
+        if self._deferred:
+            self._write(self._deferred)
+            self._deferred = ""
 
     def close(self) -> None:
         try:
-            self._flush()
+            self._settle()
             self._write(f"\n---\n\n*Session ended "
                         f"{datetime.now().isoformat(timespec='seconds')}.*\n")
         except Exception:       # noqa: BLE001
@@ -318,18 +346,30 @@ class MdLog:
 
     @staticmethod
     def _quiz_result(out: dict) -> str:
+        """Folded shut, because the agent says all of this better.
+
+        The tool's `explanation` was committed before the question was shown
+        and the agent's own account of the grade follows in prose, tailored to
+        what the learner actually said. Printing both leaves the log saying
+        everything twice, in two registers.
+
+        The record still matters -- it is the pre-commitment, and checking the
+        prose against it is the point -- so it is kept and collapsed rather
+        than dropped. The diagnosis stays in the summary line, visible while
+        folded, because that is the one word worth skimming for.
+        """
         mark = "correct" if out.get("pick_correct") else "wrong"
-        lines = ["\n#### Graded\n",
-                 f"\n**{out.get('diagnosis')}** — pick {mark}"]
+        head = f"{out.get('diagnosis')} — pick {mark}"
         if verdict := out.get("reason_verdict"):
-            lines.append(f", reasoning `{verdict}`")
-        lines.append("\n")
+            head += f", reasoning {verdict}"
+        body = [f"\n<details><summary><b>Graded:</b> {head}</summary>\n\n"]
         for key in ("explanation", "next_step"):
             # Released by the grading call, so no longer a secret. This is the
             # only place either appears, and it is after the answer.
             if value := out.get(key):
-                lines.append(f"\n{value}\n")
-        return "".join(lines)
+                body.append(f"{value}\n\n")
+        body.append("</details>\n")
+        return "".join(body)
 
     @staticmethod
     def _explain_result(out: dict) -> str:

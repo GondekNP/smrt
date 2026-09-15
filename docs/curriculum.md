@@ -315,16 +315,38 @@ smrt-curriculum snip ASM/3.4 98                    # render the page, look at it
 smrt-curriculum snip ASM/3.4 98 90,405,495,165     # cut that box, embed it
 ```
 
-Two steps because a crop box can only be chosen **by looking** — nothing in the
-canon records where on a page a table sits. A command rather than a documented
-`pdftoppm` invocation for the same reason `locate` exists: pdftoppm's
-`-x/-y/-W/-H` are pixels *at the render resolution*, so a box measured on the
-preview names different pixels on the sharper cut. `snip` scales it. Getting
-that multiplication wrong crops the wrong part of the page and reports success.
+**That first design was wrong, and the fix is the interesting part.** Choosing
+a box by looking at a preview does not work. Measured 2026-09-15: asked for the
+design matrix on p. 99, the model guessed a box, saw the result was short,
+guessed a taller one from the same origin, and still cut off rows 4-6 and
+clipped the top line. It also shelled out to PIL to ask how big the preview
+was, because nothing told it. Estimating pixel coordinates from an image is not
+a capability to wait for.
 
-The preview goes to `/tmp`, not the vault — it is scaffolding for choosing
-coordinates, and a notes graph full of half-chosen page renders is cruft. Only
-the cut lands in `attachments/`.
+The page already knows where its lines are. `pdftotext -bbox-layout` reports
+every word's box in points, so the crop can be named by **content**:
+
+```bash
+smrt-curriculum snip ASM/3.4 99 --from "Finally, here is the means" \
+                               --to "vector/matrix notation"
+```
+
+Three details that turned out to matter:
+
+- **Parse it as HTML, not XML.** Poppler calls the output XHTML, but Kéry
+  p. 98 contains a glyph it could not map, emitted as a raw `0x02` inside a
+  `<word>`. XML forbids that outright, so `ElementTree` refused the entire
+  page over one character in one word nobody needed.
+- **`--to` matches the last line containing the phrase**, so a short anchor
+  runs long. A phrase that matches nothing is an error rather than a silent
+  crop of whatever was nearby.
+- **Clamp the margin to the midpoint of the gap** between the anchored lines
+  and their neighbours. A crop with a sliced-off row of text at its edge reads
+  as a mistake even when everything asked for is present.
+
+The manual `x,y,w,h` form survives for pages with no text layer, and the
+preview for it goes to `/tmp` rather than the vault — scaffolding, not notes.
+Only the cut lands in `attachments/`.
 
 **And every claim about the text carries its printed page.** "As Kéry notes" is
 unfindable; "Kéry p. 98" can be turned to. A learner with the book open who

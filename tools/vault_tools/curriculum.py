@@ -649,6 +649,126 @@ class _Unresolved(Exception):
     """A page reference that cannot be turned into a file and a pdf page."""
 
 
+# pdftotext -bbox-layout reports word boxes in PDF points, origin top left.
+# pdftoppm's crop is in pixels at the render resolution. 72 points to the inch
+# is the whole conversion.
+_PT_PER_INCH = 72
+
+
+def _lines_with_boxes(pdf: str, pdf_page: int) -> list[tuple[float, float, float, float, str]]:
+    """Every line on the page as `(yMin, yMax, xMin, xMax, text)`, in points.
+
+    Parsed with the tolerant HTML parser rather than an XML one, though
+    poppler calls the output XHTML. Measured on Kery p. 98: a glyph poppler
+    could not map came through as a raw 0x02 inside a `<word>`, which XML
+    forbids outright -- `ElementTree` refused the whole page over one
+    character in one word. Nothing here needs that word; it needs the boxes.
+    """
+    import subprocess
+    from html.parser import HTMLParser
+
+    class Boxes(HTMLParser):
+        # HTMLParser lowercases tags and attributes, so xMin arrives as xmin.
+        def __init__(self) -> None:
+            super().__init__(convert_charrefs=True)
+            self.lines: list[tuple[float, float, float, float, str]] = []
+            self._box: tuple[float, float, float, float] | None = None
+            self._words: list[str] = []
+            self._word: str | None = None
+
+        def handle_starttag(self, tag, attrs) -> None:
+            at = dict(attrs)
+            if tag == "line":
+                try:
+                    self._box = (float(at.get("ymin") or 0),
+                                 float(at.get("ymax") or 0),
+                                 float(at.get("xmin") or 0),
+                                 float(at.get("xmax") or 0))
+                except ValueError:
+                    self._box = None
+                self._words = []
+            elif tag == "word":
+                self._word = ""
+
+        def handle_data(self, data: str) -> None:
+            if self._word is not None:
+                self._word += data
+
+        def handle_endtag(self, tag: str) -> None:
+            if tag == "word" and self._word is not None:
+                if self._word.strip():
+                    self._words.append(self._word.strip())
+                self._word = None
+            elif tag == "line":
+                if self._box and self._words:
+                    self.lines.append((*self._box, " ".join(self._words)))
+                self._box = None
+
+    run = subprocess.run(
+        ["pdftotext", "-f", str(pdf_page), "-l", str(pdf_page),
+         "-bbox-layout", pdf, "-"],
+        capture_output=True, text=True, errors="replace", check=False)
+    if run.returncode != 0:
+        raise _Unresolved(f"pdftotext failed on {pdf}: "
+                          f"{run.stderr.strip()[:200]}")
+    reader = Boxes()
+    reader.feed(run.stdout)
+    reader.close()
+    return sorted(reader.lines, key=lambda row: row[0])
+
+
+def _norm(text: str) -> str:
+    return " ".join(text.split()).casefold()
+
+
+def anchor_box(pdf: str, pdf_page: int, start: str, end: str, dpi: int,
+               margin_pt: float = 7.0) -> tuple[int, int, int, int]:
+    """The crop box, in pixels at `dpi`, spanning the lines from `start` to
+    `end` inclusive.
+
+    This exists because choosing a box by looking at a preview does not work.
+    Measured 2026-09-15: asked for the design matrix on p. 99, a model guessed
+    a box, saw it was short, guessed a taller one from the same origin, and
+    still cut off half the table and clipped the first line. Estimating pixel
+    coordinates from an image is not a thing to be better at -- the page has
+    a text layer that already knows exactly where every line is.
+    """
+    lines = _lines_with_boxes(pdf, pdf_page)
+    if not lines:
+        raise _Unresolved(
+            f"page {pdf_page} has no text layer, so it cannot be anchored to "
+            "text -- give an explicit x,y,w,h box instead")
+    want_start, want_end = _norm(start), _norm(end)
+    first = next((i for i, row in enumerate(lines)
+                  if want_start in _norm(row[4])), None)
+    if first is None:
+        raise _Unresolved(f"no line on page {pdf_page} contains {start!r}")
+    last = next((i for i in range(len(lines) - 1, first - 1, -1)
+                 if want_end in _norm(lines[i][4])), None)
+    if last is None:
+        raise _Unresolved(
+            f"no line at or below {start!r} contains {end!r} on page "
+            f"{pdf_page}")
+
+    span = lines[first:last + 1]
+    top = min(row[0] for row in span) - margin_pt
+    bottom = max(row[1] for row in span) + margin_pt
+    # Stop the margin halfway into the gap rather than letting it swallow the
+    # descenders of the line above and the ascenders of the line below. A crop
+    # with a sliced-off row of text at its edge reads as a mistake even when
+    # everything asked for is present.
+    if first > 0:
+        top = max(top, (lines[first - 1][1] + lines[first][0]) / 2)
+    if last + 1 < len(lines):
+        bottom = min(bottom, (lines[last][1] + lines[last + 1][0]) / 2)
+    left = min(row[2] for row in span) - margin_pt
+    right = max(row[3] for row in span) + margin_pt
+    scale = dpi / _PT_PER_INCH
+    x = max(0, int(left * scale))
+    y = max(0, int(top * scale))
+    return x, y, int(right * scale) - x, int(bottom * scale) - y
+
+
 def resolve_page(canons: Sequence[Canon], spec: str, page: str):
     """`("ASM/3.4", "98")` -> the canon, topic, source path and pdf page.
 
@@ -688,6 +808,18 @@ def main(argv: list[str] | None = None) -> int:
     # The crop box is optional -- without one, `snip` emits the preview step
     # instead. Matched rather than counted, so an omitted box cannot silently
     # consume the canon directory that follows it.
+    # Text anchors: `snip ASM/3.4 99 --from "Finally, here" --to "[. . .]"`.
+    # Pulled out before the positional slots below, so a phrase containing a
+    # space or a digit cannot be mistaken for a box or a directory.
+    def take(flag: str) -> str:
+        if flag in args:
+            at = args.index(flag)
+            args.pop(at)
+            return args.pop(at) if at < len(args) else ""
+        return ""
+
+    from_text = take("--from")
+    to_text = take("--to")
     box = args.pop(0) if (action == "snip" and args
                           and _BOX.match(args[0])) else ""
     # A box that did not match is still obviously meant as one -- and left
@@ -763,7 +895,7 @@ def main(argv: list[str] | None = None) -> int:
             return 1
         path, first, last = placed
         print(f"  printed pp. {topic.pages}  ->  pdf pp. {first}-{last}")
-        print(f'  pdftotext -f {first} -l {last} "$SUBJECT_ROOT/{path}" -')
+        print(f'  pdftotext -f {first} -l {last} "/subject/{path}" -')
         return 0
 
     if action == "figure":
@@ -807,7 +939,7 @@ def main(argv: list[str] | None = None) -> int:
         # wrong in a way nobody would predict.
         print(f'  pdftoppm -f {handle.pdf_page(printed)} '
               f'-l {handle.pdf_page(printed)} -r 150 -png -singlefile '
-              f'"$SUBJECT_ROOT/{path}" /vault/attachments/{out}')
+              f'"/subject/{path}" /vault/attachments/{out}')
         print(f"  then embed:  ![[{out}.png]]")
         return 0
 
@@ -855,13 +987,39 @@ def main(argv: list[str] | None = None) -> int:
                   f" pp. {topic.pages}", file=sys.stderr)
         print(f"{canon.tag} {topic.ref}  printed p. {printed} -> pdf p. {pdf}")
 
+        source = f"/subject/{path}"
+
+        if from_text:
+            # The good path. Anchoring to text is exact where looking at a
+            # preview is a guess, and the guess has already been measured:
+            # p. 99 came back with half the table missing, twice.
+            try:
+                x, y, w, h = anchor_box(source, pdf, from_text,
+                                        to_text or from_text, SNIP_DPI)
+            except _Unresolved as why:
+                print(f"  {why}", file=sys.stderr)
+                return 1
+            out = f"{canon.course_id}-p{printed}"
+            print(f"  anchored from {from_text!r} to "
+                  f"{(to_text or from_text)!r}")
+            print(f'  pdftoppm -f {pdf} -l {pdf} -r {SNIP_DPI} -png '
+                  f'-singlefile -x {x} -y {y} -W {w} -H {h} '
+                  f'"{source}" /vault/attachments/{out}')
+            print(f"  then embed:  ![[{out}.png]]")
+            print(f"  and cite it: {canon.tag} p. {printed}")
+            print("  then LOOK at the result — an anchor that matched the "
+                  "wrong line crops confidently")
+            return 0
+
         if not box:
-            # Step one: the whole page, at the resolution the box will be
-            # measured in. To /tmp, not the vault -- a preview is scaffolding
-            # for choosing coordinates and has no business in the notes graph.
-            print(f"  step 1 of 2 — render it, then LOOK at it:")
+            # Step one: the whole page, at the resolution a manual box would
+            # be measured in. To /tmp, not the vault -- a preview is
+            # scaffolding and has no business in the notes graph.
+            print("  prefer --from/--to; a box chosen by eye off this "
+                  "preview is a guess, and guesses have been wrong here")
+            print("  step 1 of 2 — render it, then LOOK at it:")
             print(f'  pdftoppm -f {pdf} -l {pdf} -r {PREVIEW_DPI} -png '
-                  f'-singlefile "$SUBJECT_ROOT/{path}" /tmp/preview-p{printed}')
+                  f'-singlefile "{source}" /tmp/preview-p{printed}')
             print(f"  read /tmp/preview-p{printed}.png, choose the box around "
                   "what you want")
             print(f"  then: snip {spec} {printed} x,y,w,h   "
@@ -879,9 +1037,10 @@ def main(argv: list[str] | None = None) -> int:
         # -singlefile, so the output is exactly <out>.png -- see `figure`.
         print(f'  pdftoppm -f {pdf} -l {pdf} -r {SNIP_DPI} -png -singlefile '
               f'-x {x * k} -y {y * k} -W {w * k} -H {h * k} '
-              f'"$SUBJECT_ROOT/{path}" /vault/attachments/{out}')
+              f'"{source}" /vault/attachments/{out}')
         print(f"  then embed:  ![[{out}.png]]")
         print(f"  and cite it: {canon.tag} p. {printed}")
+        print("  then LOOK at the result — a box chosen by eye is a guess")
         return 0
 
     if action == "seed":

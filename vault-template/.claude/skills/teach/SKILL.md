@@ -109,6 +109,18 @@ measures nothing. Ask instead for what a pick alone cannot show:
 See `docs/teaching-loop.md` for distractor construction and the eight-outcome
 diagnosis table.
 
+## Do not narrate the plumbing
+
+The session log is what the learner reads back. **Sentences about your own
+tooling do not belong in it** — "let me locate the pages", "now I'll re-pose
+that with the quiz tool", "committing the rubric first". They are noise between
+the parts that teach, and there is a lot of them relative to the lesson.
+
+Run the command and show the result. A snip needs no preamble; the figure and
+its citation say everything. The one exception is when a tool **fails** or the
+source does not have what was expected — then say so plainly, because that
+changes what the learner should believe.
+
 ## Say the diagnosis out loud
 
 **Every grade is told to the learner, in one line, before you move on.**
@@ -328,22 +340,31 @@ learner unable to find what you are talking about in their own copy.**
 **If what you are about to describe is a table, a block of R output, a design
 matrix, or a typeset equation — do not describe it. Cut it out and show it.**
 
+**Say what to include, not where it is on the page:**
+
 ```bash
-smrt-curriculum snip ASM/3.4 98              # step 1: render the page, LOOK at it
-smrt-curriculum snip ASM/3.4 98 90,405,495,165   # step 2: cut that box, embed it
+smrt-curriculum snip ASM/3.4 99 --from "Finally, here is the means" --to "vector/matrix notation"
 ```
 
-Step 1 renders the whole page to `/tmp` and you read it like any other image.
-Step 2 takes the box you measured **on that preview** and emits the crop
-command plus its `![[...]]` embed.
+`--from` and `--to` are phrases as they appear in the text. The page's own
+layout says where those lines are, to the point, and the crop is computed from
+that.
 
-It is two commands because the box has to be *chosen by looking* — there is no
-way to know where a table sits on a page without seeing the page. And it is a
-command rather than a hand-written `pdftoppm` because the coordinates are
-pixels **at the resolution you rendered at**: a box measured on the preview
-names different pixels on the sharper cut. `snip` does that multiplication.
-Same rule as `locate` — that arithmetic is not yours to do, because getting it
-wrong yields a confident crop of the wrong part of the page.
+**Do not choose a box by eye.** There is a manual `x,y,w,h` form for pages with
+no text layer, and it is a last resort: measured 2026-09-15, asked for a design
+matrix, a model guessed a box, saw the result was short, guessed a taller one
+from the same origin, and still cut off half the table and clipped the first
+line. Estimating pixel coordinates from an image is not a skill to work on. The
+text layer already knows.
+
+Anchor notes, all of which matter:
+
+- **`--to` matches the last line containing the phrase**, so `--to "6"` will
+  find a `6` much further down the page than you meant. Use something
+  distinctive — a phrase, not a token.
+- A phrase that matches nothing is an **error**, not a silent bad crop.
+- **Look at the result anyway.** An anchor that matched the wrong line crops
+  just as confidently as a bad box.
 
 A whole page, when the whole page is the point:
 

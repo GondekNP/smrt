@@ -353,3 +353,58 @@ class TestDrawingsSurvive(Base):
         swallowed as a duplicate of something."""
         self.feed(text("![[kery-asm-p98.png]]"))
         self.assertIn("![[kery-asm-p98.png]]", self.read())
+
+
+class TestTheQuestionIsWrittenOnce(Base):
+    """Measured 2026-09-15: the pose tool call arrived BEFORE the agent's
+    prose, so the "has the prose already posed it?" check found nothing to
+    dedupe against and the log carried the same question twice -- once in the
+    tool's spelling, once in the agent's, with different notation."""
+
+    PROSE = ("**Q4.** Restrict attention to the two region-2 rows.\n\n"
+             "- **A.** reg2:hab3 equals reg2 minus reg2:hab2.\n"
+             "- **B.** Both are identically zero.\n")
+
+    def test_prose_after_the_tool_call_still_wins(self) -> None:
+        self.feed(completed("t1", QUIZ_OUTPUT), text(self.PROSE))
+        written = self.read()
+        self.assertIn("**Q4.**", written)
+        self.assertNotIn("### Quiz", written)
+
+    def test_prose_before_the_tool_call_still_wins(self) -> None:
+        """The case that already worked. It must keep working."""
+        self.feed(text(self.PROSE), completed("t1", QUIZ_OUTPUT))
+        written = self.read()
+        self.assertIn("**Q4.**", written)
+        self.assertNotIn("### Quiz", written)
+
+    def test_silent_prose_leaves_the_fallback_in_place(self) -> None:
+        """If the agent never poses the question itself, the learner still has
+        to be able to read it."""
+        self.feed(completed("t1", QUIZ_OUTPUT), text("Here we go."))
+        written = self.read()
+        self.assertIn("### Quiz", written)
+        self.assertIn("Which carries the information", written)
+
+    def test_a_held_question_precedes_the_grade_that_follows_it(self) -> None:
+        self.feed(completed("t1", QUIZ_OUTPUT), completed("t2", QUIZ_RESULT))
+        written = self.read()
+        self.assertLess(written.index("Which carries"),
+                        written.index("observed Fisher information"))
+
+
+class TestTheGradeIsFoldedShut(Base):
+    def test_the_diagnosis_stays_visible_in_the_summary(self) -> None:
+        """One word worth skimming for, readable without opening anything."""
+        self.feed(completed("t2", QUIZ_RESULT))
+        written = self.read()
+        self.assertIn("<summary>", written)
+        self.assertIn(str(QUIZ_RESULT["diagnosis"]), written.split("</summary>")[0])
+
+    def test_the_committed_explanation_is_kept_not_dropped(self) -> None:
+        """Folded, because the agent says it better in prose -- but it is the
+        pre-commitment, and checking the prose against it is the point."""
+        self.feed(completed("t2", QUIZ_RESULT))
+        written = self.read()
+        self.assertIn("observed Fisher information", written)
+        self.assertIn("</details>", written)

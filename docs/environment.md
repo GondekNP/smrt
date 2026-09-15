@@ -147,6 +147,16 @@ its own built-in notion of read-only commands. That is why this list is short.
 It contains the things the image added — the document toolchain and the
 curriculum CLI — and nothing that was already fine.
 
+**A prefix rule cannot match a command containing a shell variable.** The
+commands `locate`, `figure` and `snip` print used to embed `$SUBJECT_ROOT`,
+which `bin/smrt` sets to `/subject`. The commands ran fine by hand and were
+denied every time under the rules, because a command whose text is not
+statically known cannot be matched against a prefix — so the agent was still
+being asked before every page read, with allow rules that looked correct.
+Measured under `--permission-prompts none`: the `$SUBJECT_ROOT` form was denied
+and wrote no file, the literal `/subject/...` form ran. They now print the
+literal path. The variable was never buying anything.
+
 Personal grants still accumulate in `.claude/settings.local.json`, which is
 gitignored. The shared rules are versioned; the ad-hoc ones are not.
 
