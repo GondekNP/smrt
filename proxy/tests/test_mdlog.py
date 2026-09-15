@@ -338,3 +338,18 @@ class TestDrawingsSurvive(Base):
         half = len(self.SVG) // 2
         self.feed(text(self.SVG[:half]), text(self.SVG[half:]))
         self.assertIn(self.SVG, self.read())
+
+    def test_an_image_embed_survives(self) -> None:
+        """A page snipped out of the source text reaches the learner the same
+        way a drawing does: as an embed in the agent's own message. Nothing in
+        the mirror knows what an attachment is, and nothing should."""
+        self.feed(text("The design matrix, Kéry p. 98:\n\n"
+                       "![[kery-asm-p98.png]]"))
+        self.assertIn("![[kery-asm-p98.png]]", self.read())
+
+    def test_a_wikilink_embed_is_not_mistaken_for_a_posed_question(self) -> None:
+        """The prose-dedupe looks for the skill's `- **A.**` option list. An
+        embed is not one, and a message that is only a figure must not be
+        swallowed as a duplicate of something."""
+        self.feed(text("![[kery-asm-p98.png]]"))
+        self.assertIn("![[kery-asm-p98.png]]", self.read())

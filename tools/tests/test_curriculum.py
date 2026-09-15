@@ -775,3 +775,82 @@ class TestLocateAndFigure(unittest.TestCase):
             code = curriculum.main(["figure", "ASM/2.5"])
         self.assertEqual(code, 2)
         self.assertIn("usage", out.getvalue())
+
+
+class TestSnip(unittest.TestCase):
+    """`snip` cuts a region out of a page, because `pdftotext` preserves prose
+    and destroys layout.
+
+    Measured on 2026-09-15 against Kery p. 98: a table of R output extracts
+    with its headers and its values on separate lines, so "reg2:hab2 is -50"
+    is a reconstruction the learner has no way to check. The failure this
+    prevents is a tutor describing a table it cannot actually read."""
+
+    def run_cli(self, *args: str) -> tuple[int, str]:
+        import contextlib
+        import io
+
+        with tempfile.TemporaryDirectory() as directory:
+            (Path(directory) / "b.toml").write_text(BOOK)
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out), contextlib.redirect_stderr(out):
+                code = curriculum.main([*args, directory, "/tmp"])
+            return code, out.getvalue()
+
+    def test_without_a_box_it_renders_a_preview_to_look_at(self) -> None:
+        code, out = self.run_cli("snip", "SPLIT/2.1", "33")
+        self.assertEqual(code, 0)
+        self.assertIn(f"-r {curriculum.PREVIEW_DPI}", out)
+        self.assertIn("-f 19 -l 19", out)
+        self.assertIn("LOOK at it", out)
+
+    def test_the_preview_does_not_land_in_the_vault(self) -> None:
+        """Scaffolding for choosing coordinates. The notes graph is for notes,
+        and a directory of half-chosen page renders is not one."""
+        _, out = self.run_cli("snip", "SPLIT/2.1", "33")
+        self.assertIn("/tmp/preview-p33", out)
+        self.assertNotIn("/vault/attachments/split-book-p33", out)
+
+    def test_the_box_is_scaled_from_preview_dpi_to_snip_dpi(self) -> None:
+        """The reason this is a command rather than a line in a skill.
+        pdftoppm's -x/-y/-W/-H are pixels AT THE CHOSEN -r, so a box measured
+        on the preview names different pixels on the sharper render. Handing
+        it over unscaled crops the wrong part of the page, confidently."""
+        code, out = self.run_cli("snip", "SPLIT/2.1", "33", "90,405,495,165")
+        self.assertEqual(code, 0)
+        factor = curriculum.SNIP_DPI // curriculum.PREVIEW_DPI
+        self.assertIn(f"-x {90 * factor} -y {405 * factor} "
+                      f"-W {495 * factor} -H {165 * factor}", out)
+        self.assertIn(f"-r {curriculum.SNIP_DPI}", out)
+
+    def test_the_cut_lands_in_the_vault_with_a_knowable_name(self) -> None:
+        code, out = self.run_cli("snip", "SPLIT/2.1", "33", "10,10,50,50")
+        self.assertEqual(code, 0)
+        self.assertIn("-singlefile", out)
+        self.assertIn("/vault/attachments/split-book-p33", out)
+        self.assertIn("![[split-book-p33.png]]", out)
+
+    def test_it_says_how_to_cite_what_it_cut(self) -> None:
+        """The other half of the complaint that prompted this: material the
+        learner could not locate in their own copy. A snip without a printed
+        page number is still unfindable."""
+        _, out = self.run_cli("snip", "SPLIT/2.1", "33", "10,10,50,50")
+        self.assertIn("cite it: SPLIT p. 33", out)
+
+    def test_a_malformed_box_is_not_read_as_a_directory(self) -> None:
+        """It sits in the same argument slot as the canon directory, so left
+        alone `snip X/Y 98 90,405,495` surfaces as "no canon files in
+        90,405,495" -- an error about the wrong thing entirely."""
+        import contextlib
+        import io
+
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(out):
+            code = curriculum.main(["snip", "SPLIT/2.1", "33", "90,405,495"])
+        self.assertEqual(code, 2)
+        self.assertIn("not a crop box", out.getvalue())
+
+    def test_a_page_outside_the_topic_warns_but_still_works(self) -> None:
+        code, out = self.run_cli("snip", "SPLIT/2.1", "50", "10,10,50,50")
+        self.assertEqual(code, 0)
+        self.assertIn("outside", out)

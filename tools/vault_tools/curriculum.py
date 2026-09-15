@@ -57,6 +57,23 @@ _UNSAFE = re.compile(r'[:/\\|#^\[\]?*"<>]')
 # and "around p. 100" belong in `locator`, which is free text.
 _PAGES = re.compile(r"\d{1,5}(?:-\d{1,5})?")
 
+# Snipping a region out of a page happens at two resolutions: one to look at
+# and choose a box on, a larger one to actually cut. PREVIEW_DPI is chosen so
+# a whole page is legible to a model without being enormous; SNIP_DPI so the
+# cut is sharp enough to read a table of small monospaced digits.
+#
+# The two differing is the entire reason `snip` exists rather than a note in a
+# skill telling someone to run pdftoppm. pdftoppm's -x/-y/-W/-H are in PIXELS
+# AT THE CHOSEN -r, so a box measured on the preview is wrong by exactly
+# SNIP_DPI/PREVIEW_DPI when handed to the sharper render -- and wrong here
+# means a crop of the wrong part of the page, delivered confidently. That is
+# the same failure `locate` exists to prevent, one coordinate system over.
+PREVIEW_DPI = 110
+SNIP_DPI = 220
+
+# A crop box as the preview shows it: x,y,w,h in preview pixels.
+_BOX = re.compile(r"^(\d{1,5}),(\d{1,5}),(\d{1,5}),(\d{1,5})$")
+
 # Every kind needs an identity and a date someone checked it. What counts as
 # a citation differs by kind, so the rest is per-kind: a course lives at a URL,
 # a book is identified by author and edition, a paper by author and a link.
@@ -628,16 +645,58 @@ def audit(canon: Canon, vault_root: str | Path) -> AuditReport:
     return report
 
 
+class _Unresolved(Exception):
+    """A page reference that cannot be turned into a file and a pdf page."""
+
+
+def resolve_page(canons: Sequence[Canon], spec: str, page: str):
+    """`("ASM/3.4", "98")` -> the canon, topic, source path and pdf page.
+
+    Shared by `figure` and `snip`, which differ only in what they do once the
+    page is pinned down. Raises `_Unresolved` with the message to print.
+    """
+    tag, _, ref = spec.rpartition("/")
+    if not tag or not ref or not page.isdigit():
+        raise _Unresolved("usage: <canon>/<ref> <printed page>")
+    found = [c for c in canons if tag in (c.tag, c.course_id, c.number)]
+    if not found:
+        raise _Unresolved(f"no canon matching {tag!r}; try `list`")
+    canon = found[0]
+    topic = next((t for t in canon.topics if t.ref == ref), None)
+    if topic is None:
+        raise _Unresolved(f"{canon.tag} has no topic {ref!r}")
+    handle = canon.file_for(topic)
+    span = topic.page_range
+    if handle is None or span is None:
+        raise _Unresolved(f"{canon.tag} {ref} has no file recorded")
+    printed = int(page)
+    outside = not span[0] <= printed <= span[1]
+    path = f"{canon.root}/{handle.path}" if canon.root else handle.path
+    return canon, topic, path, printed, handle.pdf_page(printed), outside
+
+
 def main(argv: list[str] | None = None) -> int:
     """`python3 -m vault_tools.curriculum {seed|audit|list} [...]`"""
     import sys
 
     args = list(sys.argv[1:] if argv is None else argv)
     action = args.pop(0) if args else "list"
-    spec = args.pop(0) if action in ("locate", "figure") and args else ""
-    # `figure` takes its page here, before the optional canon dir and vault,
-    # or the page number is swallowed as a directory.
-    page = args.pop(0) if action == "figure" and args else ""
+    spec = args.pop(0) if action in ("locate", "figure", "snip") and args else ""
+    # `figure` and `snip` take their page here, before the optional canon dir
+    # and vault, or the page number is swallowed as a directory.
+    page = args.pop(0) if action in ("figure", "snip") and args else ""
+    # The crop box is optional -- without one, `snip` emits the preview step
+    # instead. Matched rather than counted, so an omitted box cannot silently
+    # consume the canon directory that follows it.
+    box = args.pop(0) if (action == "snip" and args
+                          and _BOX.match(args[0])) else ""
+    # A box that did not match is still obviously meant as one -- and left
+    # alone it would be read as the canon directory, surfacing as "no canon
+    # files in 90,405,495". Say what is actually wrong instead.
+    if action == "snip" and not box and args and not Path(args[0]).is_dir():
+        print(f"not a crop box: {args[0]!r} — want x,y,w,h in whole pixels, "
+              "e.g. 90,405,495,165", file=sys.stderr)
+        return 2
     canon_dir = args.pop(0) if args else "/workspace/curriculum"
     vault = args.pop(0) if args else "/vault"
 
@@ -750,6 +809,79 @@ def main(argv: list[str] | None = None) -> int:
               f'-l {handle.pdf_page(printed)} -r 150 -png -singlefile '
               f'"$SUBJECT_ROOT/{path}" /vault/attachments/{out}')
         print(f"  then embed:  ![[{out}.png]]")
+        return 0
+
+    if action == "snip":
+        # `smrt-curriculum snip ASM/3.4 98` -> render the page to look at.
+        # `smrt-curriculum snip ASM/3.4 98 90,405,495,165` -> cut that box out
+        # of it and embed the result.
+        #
+        # Why this exists, measured on 2026-09-15: `pdftotext` preserves prose
+        # and destroys layout. Kery's design matrix on printed p. 98 extracts
+        # with its column headers and its values on separate lines --
+        #
+        #     (Intercept)
+        #     65
+        #     reg2:hab2
+        #
+        #     reg2
+        #     60
+        #     reg2:hab3
+        #
+        #     -50
+        #     NA
+        #
+        # -- from which "reg2:hab2 is -50 and reg2:hab3 is NA" is a guess that
+        # happens to be right. A tutor reading that has three bad options and
+        # no good one: describe the table from a reconstruction the learner
+        # cannot check, quietly skip the only concrete thing on the page, or
+        # invent a cleaner example and present it as the book's.
+        #
+        # So: tables, R output, matrices and typeset equations get SHOWN. The
+        # learner sees the same pixels the tutor did, and can find them on a
+        # numbered page in their own copy.
+        try:
+            canon, topic, path, printed, pdf, outside = resolve_page(
+                canons, spec, page)
+        except _Unresolved as why:
+            usage = str(why).startswith("usage:")
+            print("usage: snip <canon>/<ref> <printed page> [x,y,w,h]"
+                  if usage else str(why), file=sys.stderr)
+            return 2 if usage else 1
+        if outside:
+            # Not fatal: the table you want often sits a page outside the
+            # section that discusses it.
+            print(f"  note: printed page {printed} is outside {topic.ref}'s"
+                  f" pp. {topic.pages}", file=sys.stderr)
+        print(f"{canon.tag} {topic.ref}  printed p. {printed} -> pdf p. {pdf}")
+
+        if not box:
+            # Step one: the whole page, at the resolution the box will be
+            # measured in. To /tmp, not the vault -- a preview is scaffolding
+            # for choosing coordinates and has no business in the notes graph.
+            print(f"  step 1 of 2 — render it, then LOOK at it:")
+            print(f'  pdftoppm -f {pdf} -l {pdf} -r {PREVIEW_DPI} -png '
+                  f'-singlefile "$SUBJECT_ROOT/{path}" /tmp/preview-p{printed}')
+            print(f"  read /tmp/preview-p{printed}.png, choose the box around "
+                  "what you want")
+            print(f"  then: snip {spec} {printed} x,y,w,h   "
+                  f"(pixels as they are in that {PREVIEW_DPI} dpi preview)")
+            return 0
+
+        # Step two. The scale factor is the whole point: a box measured at
+        # PREVIEW_DPI names different pixels at SNIP_DPI, and multiplying it
+        # by hand is exactly the arithmetic this command exists to absorb.
+        x, y, w, h = (int(v) for v in _BOX.match(box).groups())
+        k = SNIP_DPI // PREVIEW_DPI
+        out = f"{canon.course_id}-p{printed}"
+        print(f"  step 2 of 2 — cut {w}x{h} at ({x},{y}) in the preview, "
+              f"rendered at {SNIP_DPI} dpi:")
+        # -singlefile, so the output is exactly <out>.png -- see `figure`.
+        print(f'  pdftoppm -f {pdf} -l {pdf} -r {SNIP_DPI} -png -singlefile '
+              f'-x {x * k} -y {y * k} -W {w * k} -H {h * k} '
+              f'"$SUBJECT_ROOT/{path}" /vault/attachments/{out}')
+        print(f"  then embed:  ![[{out}.png]]")
+        print(f"  and cite it: {canon.tag} p. {printed}")
         return 0
 
     if action == "seed":

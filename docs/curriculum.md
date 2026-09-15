@@ -281,6 +281,56 @@ folder of PDFs" and `rg` cannot read one, so before 2026-09-11 a textbook could
 be mounted and never searched. `pdftotext -f 108 -l 113` also extracts *by
 page*, which is what makes a locator actionable rather than decorative.
 
+### What extraction loses, and the command that gets it back
+
+`pdftotext` preserves prose and **destroys layout**. Tables, R output,
+matrices, typeset equations — anything whose meaning is carried by its
+arrangement — come back as a column of correct tokens in the wrong order.
+
+Measured 2026-09-15 on Kéry p. 98, an R coefficient block reading
+`(Intercept) 65, reg2 60, hab2 15, hab3 -15, reg2:hab2 -50, reg2:hab3 NA`:
+
+```
+(Intercept)      reg2          -50
+65               60            NA
+reg2:hab2        reg2:hab3
+```
+
+(laid out here in columns to save space; it arrives as one long list). Every
+name and number survived. The pairing did not. A tutor working from that can
+only guess which value belongs to which coefficient — and in the live session
+that prompted this, it guessed **correctly**, which is worse than guessing
+wrong, because nothing in the transcript distinguishes the two.
+
+This matters more than it looks. The three available failures are: describe
+the table from an unverifiable reconstruction; skip the only concrete thing on
+the page; or invent a tidier example and attribute it to the book. The learner
+reported the symptom as *"it is referencing things I don't see in the book, or
+can't locate exactly"* — which is all three at once, from the outside.
+
+So `snip` cuts the region out as an image:
+
+```bash
+smrt-curriculum snip ASM/3.4 98                    # render the page, look at it
+smrt-curriculum snip ASM/3.4 98 90,405,495,165     # cut that box, embed it
+```
+
+Two steps because a crop box can only be chosen **by looking** — nothing in the
+canon records where on a page a table sits. A command rather than a documented
+`pdftoppm` invocation for the same reason `locate` exists: pdftoppm's
+`-x/-y/-W/-H` are pixels *at the render resolution*, so a box measured on the
+preview names different pixels on the sharper cut. `snip` scales it. Getting
+that multiplication wrong crops the wrong part of the page and reports success.
+
+The preview goes to `/tmp`, not the vault — it is scaffolding for choosing
+coordinates, and a notes graph full of half-chosen page renders is cruft. Only
+the cut lands in `attachments/`.
+
+**And every claim about the text carries its printed page.** "As Kéry notes" is
+unfindable; "Kéry p. 98" can be turned to. A learner with the book open who
+cannot locate a claim either takes it on faith — the opposite of the point — or
+reads it as invention, which discredits every other citation in the session.
+
 ## The mechanism: import once, seed often
 
 Two steps, and separating them is what keeps the layers apart in practice

@@ -288,23 +288,84 @@ recording what you found as a locator suggestion for a human to check.
 exact wording matters. The vault is a record of the learner's understanding,
 not a copy of somebody's book.
 
-### Showing a figure
+### `pdftotext` keeps the prose and destroys the layout
 
-When the source has a figure the lesson turns on — a likelihood curve, a plate
-diagram — show it rather than describing it:
+This is the single most important thing to know about reading a book here, and
+it is invisible unless you go looking. Extraction preserves sentences. It does
+**not** preserve anything whose meaning lives in its arrangement — tables, R
+output, matrices, typeset equations, anything in columns.
 
-```bash
-smrt-curriculum figure ASM/2.5 33    # prints the pdftoppm command and the embed
+Measured against Kéry p. 98, whose R output reads
+`(Intercept) 65, reg2 60, hab2 15, hab3 -15, reg2:hab2 -50, reg2:hab3 NA`.
+Here is what `pdftotext` hands you:
+
+```
+(Intercept)
+65
+reg2:hab2
+
+reg2
+60
+reg2:hab3
+
+-50
+NA
 ```
 
-Same rule as `locate`: it resolves the page, so you never convert printed to
-PDF pages yourself. The image lands in `attachments/` and embeds as
-`![[kery-asm-p33.png]]`, which renders in the markdown log.
+Every name and every number survived; the pairing between them did not. From
+that, "`reg2:hab2` is −50 and `reg2:hab3` is NA" is a **guess**. It happens to
+be the right guess. You will not always be that lucky, and you cannot tell the
+lucky case from the unlucky one by looking harder.
+
+Which leaves three bad options and one good one. The bad ones: describe the
+table from a reconstruction the learner cannot check; quietly skip the only
+concrete thing on the page; or — worst, and hardest to notice from the inside —
+invent a cleaner example and present it as the book's. **All three end with the
+learner unable to find what you are talking about in their own copy.**
+
+### Show it instead
+
+**If what you are about to describe is a table, a block of R output, a design
+matrix, or a typeset equation — do not describe it. Cut it out and show it.**
+
+```bash
+smrt-curriculum snip ASM/3.4 98              # step 1: render the page, LOOK at it
+smrt-curriculum snip ASM/3.4 98 90,405,495,165   # step 2: cut that box, embed it
+```
+
+Step 1 renders the whole page to `/tmp` and you read it like any other image.
+Step 2 takes the box you measured **on that preview** and emits the crop
+command plus its `![[...]]` embed.
+
+It is two commands because the box has to be *chosen by looking* — there is no
+way to know where a table sits on a page without seeing the page. And it is a
+command rather than a hand-written `pdftoppm` because the coordinates are
+pixels **at the resolution you rendered at**: a box measured on the preview
+names different pixels on the sharper cut. `snip` does that multiplication.
+Same rule as `locate` — that arithmetic is not yours to do, because getting it
+wrong yields a confident crop of the wrong part of the page.
+
+A whole page, when the whole page is the point:
+
+```bash
+smrt-curriculum figure ASM/2.5 33
+```
 
 **A figure or a page, not a chapter.** Rendering the book into the vault page
 by page is reproducing it, and the vault is a git repo that may get a remote.
-If you find yourself rendering a third consecutive page, read it with
-`pdftotext` and describe it instead.
+If you find yourself cutting a third consecutive page, read it with `pdftotext`
+and teach from the prose instead.
+
+### Say which page, every time
+
+**Every claim about what the text says carries its printed page.** "As Kéry
+notes" is unfindable; "Kéry p. 98" can be turned to and checked.
+
+This is not bookkeeping. The learner has the book open, and a claim they cannot
+locate is one they cannot verify — so it either gets taken on faith, which is
+the opposite of the point, or it reads as something you made up, which corrodes
+every other citation in the session. Printed pages, not PDF pages: the printed
+number is the one on the page in front of them.
 
 ### A text is not automatically a curriculum
 
