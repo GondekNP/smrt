@@ -1,0 +1,9 @@
+# Obsidian's per-machine UI state. The rest of .obsidian/ is worth versioning:
+# it carries the settings that make the vault render the same way elsewhere.
+.obsidian/workspace*
+
+.trash/
+
+# Personal, per-machine permission grants. The shared rules live in
+# .claude/settings.json; this file is where one-off "yes" answers accumulate.
+.claude/settings.local.json

@@ -51,6 +51,13 @@ smrt -- python3 /workspace/proxy/tests/spawn_session.py vault-tools=vault-tools
 - **Attachments** go in `attachments/`. Set this in Obsidian:
   Settings → Files & Links → Default location for new attachments.
 - **Commit often.** This is a git repo; the history is your learning record.
+- **Permissions** live in `.claude/settings.json`, versioned with the vault. It
+  allows the document toolchain (`pdftotext`, `pdftoppm`, `rsvg-convert`), the
+  curriculum CLI, and the teaching tools — so a lesson does not stop to ask
+  before reading a page of the book it was told to teach from. An interactive
+  "yes" is saved as a *literal* rule matching one exact command, so approving
+  your way there does not work. Your own one-off grants accumulate in
+  `.claude/settings.local.json`, which is gitignored.
 
 ## Notes on `/subject`
 

@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__vault-tools__quiz",
+      "mcp__vault-tools__answer_quiz",
+      "mcp__vault-tools__explain",
+      "mcp__vault-tools__grade_explain",
+
+      "Bash(smrt-curriculum:*)",
+      "Bash(smrt-ledger:*)",
+
+      "Bash(pdftotext:*)",
+      "Bash(pdftoppm:*)",
+      "Bash(pdfinfo:*)",
+      "Bash(rsvg-convert:*)",
+      "Bash(rg:*)",
+
+      "Read(//tmp/**)",
+      "Read(//subject/**)"
+    ]
+  }
+}

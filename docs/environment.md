@@ -107,6 +107,49 @@ build.
 bind-mounted vault come out root-owned on the host, and Obsidian can't edit
 its own notes. `pixi run build` passes your real UID automatically.
 
+## What the agent may run without being asked
+
+`vault-template/.claude/settings.json` allows a named handful of commands:
+`smrt-curriculum`, `smrt-ledger`, `pdftotext`, `pdftoppm`, `pdfinfo`,
+`rsvg-convert`, `rg`, reads under `/tmp` and `/subject`, and the four
+`vault-tools` MCP tools.
+
+**The problem it solves is that approvals do not generalize.** Claude Code
+saves an interactive "yes" as a *literal* rule, so approving
+
+```
+pdftotext -f 17 -l 30 "…/Chapter-2….pdf" -
+```
+
+permits that page range of that file and nothing else. Four of those
+accumulated in the first two sessions, and every new page range was a fresh
+prompt — during a lesson, which is exactly when an interruption costs the most.
+A tutor that must stop and ask before reading page 98 of the book it was told
+to teach from is not being careful; it is being unusable, and the pressure that
+creates is to approve things without reading them.
+
+**Why this list is safe to grant is the mount, not the list.** `/subject` is
+read-only at the kernel, so every PDF command here can only read — no rule
+grants an ability the mount does not already permit. The writes land in
+`/vault`, which is the working area and a git repo. Nothing destructive is on
+it: no `rm`, no `curl`, no package installs, no blanket `Bash(*)`.
+
+Measured 2026-09-15 rather than assumed, because print mode does not enforce
+prompts and made an earlier check meaningless. With
+`claude -p --permission-prompts none`, which denies anything that would prompt:
+a `touch` into `/vault` was **denied** and the file was not created, while
+`pdftotext` on a page range never approved before **ran**, `smrt-curriculum
+locate` ran, and `pdftoppm` wrote its PNG. The gate is still live and still
+narrow — the model's own follow-up `ls` was denied in the same session.
+
+Note that `wc`, `ls` and their kind never prompt regardless: Claude Code has
+its own built-in notion of read-only commands. That is why this list is short.
+It contains the things the image added — the document toolchain and the
+curriculum CLI — and nothing that was already fine.
+
+Personal grants still accumulate in `.claude/settings.local.json`, which is
+gitignored. The shared rules are versioned; the ad-hoc ones are not.
+
 ## Terminal
 
 Toad is a Textual TUI. Pass `TERM` through. The Toad README specifically calls
