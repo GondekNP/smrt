@@ -363,8 +363,13 @@ Anchor notes, all of which matter:
   find a `6` much further down the page than you meant. Use something
   distinctive — a phrase, not a token.
 - A phrase that matches nothing is an **error**, not a silent bad crop.
-- **Look at the result anyway.** An anchor that matched the wrong line crops
-  just as confidently as a bad box.
+- **`snip` writes the file itself.** It does not hand you a command to run.
+  When it prints `wrote /vault/attachments/...`, that file exists now.
+- **Look at the result anyway** — `Read` the PNG. An anchor that matched the
+  wrong line crops just as confidently as a bad box. **Look at it; never
+  measure it.** Its pixel dimensions tell you nothing about whether the table
+  is whole, and reaching for `python3`, PIL or header bytes to find them is a
+  detour into a question that does not matter.
 
 A whole page, when the whole page is the point:
 

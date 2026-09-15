@@ -795,6 +795,37 @@ def resolve_page(canons: Sequence[Canon], spec: str, page: str):
     return canon, topic, path, printed, handle.pdf_page(printed), outside
 
 
+def cut(source: str, pdf_page: int, box: tuple[int, int, int, int],
+        destination: str, dpi: int = SNIP_DPI) -> str:
+    """Render `box` out of one page and write it. Returns the path written.
+
+    This runs `pdftoppm` rather than printing it, unlike `locate` and
+    `figure`. Measured 2026-09-15, and it is the whole reason: asked for a
+    crop, a model called `snip` three times with different anchors, never ran
+    any of the commands it was handed, and spent the rest of the turn reading
+    PNG header bytes off the PREVIOUS crop trying to work out why nothing had
+    changed. An instruction to run a command is a step that can be skipped
+    silently; a file on disk cannot be.
+    """
+    import subprocess
+
+    x, y, w, h = box
+    out = Path(destination)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    run = subprocess.run(
+        ["pdftoppm", "-f", str(pdf_page), "-l", str(pdf_page),
+         "-r", str(dpi), "-png", "-singlefile",
+         "-x", str(x), "-y", str(y), "-W", str(w), "-H", str(h),
+         source, str(out)],
+        capture_output=True, text=True, errors="replace", check=False)
+    if run.returncode != 0:
+        raise _Unresolved(f"pdftoppm failed: {run.stderr.strip()[:200]}")
+    written = out.with_suffix(".png")
+    if not written.exists():
+        raise _Unresolved(f"pdftoppm wrote nothing to {written}")
+    return str(written)
+
+
 def main(argv: list[str] | None = None) -> int:
     """`python3 -m vault_tools.curriculum {seed|audit|list} [...]`"""
     import sys
@@ -1000,30 +1031,39 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"  {why}", file=sys.stderr)
                 return 1
             out = f"{canon.course_id}-p{printed}"
+            try:
+                written = cut(source, pdf, (x, y, w, h),
+                              f"{vault}/attachments/{out}")
+            except _Unresolved as why:
+                print(f"  {why}", file=sys.stderr)
+                return 1
             print(f"  anchored from {from_text!r} to "
                   f"{(to_text or from_text)!r}")
-            print(f'  pdftoppm -f {pdf} -l {pdf} -r {SNIP_DPI} -png '
-                  f'-singlefile -x {x} -y {y} -W {w} -H {h} '
-                  f'"{source}" /vault/attachments/{out}')
-            print(f"  then embed:  ![[{out}.png]]")
-            print(f"  and cite it: {canon.tag} p. {printed}")
-            print("  then LOOK at the result — an anchor that matched the "
-                  "wrong line crops confidently")
+            print(f"  wrote {written}  ({w}x{h} px)")
+            print(f"  embed:   ![[{out}.png]]")
+            print(f"  cite it: {canon.tag} p. {printed}")
+            print(f"  now READ {written} — an anchor that matched the wrong "
+                  "line crops just as confidently as a bad box. Look at it; "
+                  "do not measure it.")
             return 0
 
         if not box:
             # Step one: the whole page, at the resolution a manual box would
             # be measured in. To /tmp, not the vault -- a preview is
             # scaffolding and has no business in the notes graph.
+            try:
+                # A whole page: no crop box, so a zero W/H means "everything".
+                written = cut(source, pdf, (0, 0, 0, 0),
+                              f"/tmp/preview-p{printed}", dpi=PREVIEW_DPI)
+            except _Unresolved as why:
+                print(f"  {why}", file=sys.stderr)
+                return 1
             print("  prefer --from/--to; a box chosen by eye off this "
                   "preview is a guess, and guesses have been wrong here")
-            print("  step 1 of 2 — render it, then LOOK at it:")
-            print(f'  pdftoppm -f {pdf} -l {pdf} -r {PREVIEW_DPI} -png '
-                  f'-singlefile "{source}" /tmp/preview-p{printed}')
-            print(f"  read /tmp/preview-p{printed}.png, choose the box around "
-                  "what you want")
-            print(f"  then: snip {spec} {printed} x,y,w,h   "
-                  f"(pixels as they are in that {PREVIEW_DPI} dpi preview)")
+            print(f"  wrote {written} at {PREVIEW_DPI} dpi")
+            print(f"  READ it, choose the box around what you want, then:")
+            print(f"    snip {spec} {printed} x,y,w,h   "
+                  f"(pixels as they are in that preview)")
             return 0
 
         # Step two. The scale factor is the whole point: a box measured at
@@ -1032,15 +1072,19 @@ def main(argv: list[str] | None = None) -> int:
         x, y, w, h = (int(v) for v in _BOX.match(box).groups())
         k = SNIP_DPI // PREVIEW_DPI
         out = f"{canon.course_id}-p{printed}"
-        print(f"  step 2 of 2 — cut {w}x{h} at ({x},{y}) in the preview, "
-              f"rendered at {SNIP_DPI} dpi:")
-        # -singlefile, so the output is exactly <out>.png -- see `figure`.
-        print(f'  pdftoppm -f {pdf} -l {pdf} -r {SNIP_DPI} -png -singlefile '
-              f'-x {x * k} -y {y * k} -W {w * k} -H {h * k} '
-              f'"{source}" /vault/attachments/{out}')
-        print(f"  then embed:  ![[{out}.png]]")
-        print(f"  and cite it: {canon.tag} p. {printed}")
-        print("  then LOOK at the result — a box chosen by eye is a guess")
+        try:
+            written = cut(source, pdf, (x * k, y * k, w * k, h * k),
+                          f"{vault}/attachments/{out}")
+        except _Unresolved as why:
+            print(f"  {why}", file=sys.stderr)
+            return 1
+        print(f"  cut {w}x{h} at ({x},{y}) in the preview, rendered at "
+              f"{SNIP_DPI} dpi")
+        print(f"  wrote {written}  ({w * k}x{h * k} px)")
+        print(f"  embed:   ![[{out}.png]]")
+        print(f"  cite it: {canon.tag} p. {printed}")
+        print(f"  now READ {written} — a box chosen by eye is a guess. Look "
+              "at it; do not measure it.")
         return 0
 
     if action == "seed":

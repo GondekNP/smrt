@@ -41,6 +41,7 @@ not listed as verified should be assumed untested.
 | Seeding | 100 notes into a vault through the real `smrt` path; re-seed is a no-op and cannot touch a judgment |
 | **A real teaching exchange** | 2026-09-11: a model posed a quiz and an explain question through Toad, graded both, and refused to soften a rubric |
 | Tool namespacing | reaches the model as `mcp__vault-tools__quiz`; the hyphen survives |
+| `snip` does the cut | it runs `pdftoppm` rather than printing it. Measured: handed commands to run, a model called `snip` three times, ran none of them, and read header bytes off the previous crop wondering why nothing changed |
 | Text-anchored crops | 2026-09-15: `snip ASM/3.4 99 --from … --to …` produced a crop carrying all six design-matrix rows, the coefficient block and the matrix notation, with clean edges — the same page an eyeballed box had cut in half twice |
 | Shell variables defeat allow rules | measured, not reasoned: the `$SUBJECT_ROOT` form of a `pdftoppm` command was denied and wrote no file; the literal `/subject/…` form ran. Commands now print literal paths |
 | The question is written once | the real 427-frame session replayed through the fixed mirror: `### Quiz` 0, `#### Graded` 0, Q4 and Q5 each posed exactly once, grade folded into `<details>` |
@@ -50,7 +51,7 @@ not listed as verified should be assumed untested.
 | The answer key | streams to the client in `rawInput` but Toad does not render it — the pre-commitment holds at the display layer |
 | `vault-tools` | serves MCP through the wrapper on `PATH`, spawned as a client spawns it |
 | Proxy tests | 80/80, in the image (Python 3.14) and on the host (3.10) |
-| Tool tests | 174/174, in the image (the MCP SDK is not a host dependency) |
+| Tool tests | 179/179, in the image (the MCP SDK is not a host dependency) |
 | shellcheck | zero errors across `bin/smrt`, `scripts/`, `docker/` |
 
 The read-only enforcement is the claim the project rests on, and it survived

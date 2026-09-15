@@ -785,58 +785,78 @@ class TestSnip(unittest.TestCase):
     Measured on 2026-09-15 against Kery p. 98: a table of R output extracts
     with its headers and its values on separate lines, so "reg2:hab2 is -50"
     is a reconstruction the learner has no way to check. The failure this
-    prevents is a tutor describing a table it cannot actually read."""
+    prevents is a tutor describing a table it cannot actually read.
 
-    def run_cli(self, *args: str) -> tuple[int, str]:
+    These patch `cut`, because what matters is the box it is asked for. That
+    it then runs `pdftoppm` rather than printing it is covered below."""
+
+    def run_cli(self, *args: str):
         import contextlib
         import io
+
+        calls = []
+
+        def fake_cut(source, pdf_page, box, destination, dpi=curriculum.SNIP_DPI):
+            calls.append({"source": source, "page": pdf_page, "box": box,
+                          "destination": destination, "dpi": dpi})
+            return f"{destination}.png"
 
         with tempfile.TemporaryDirectory() as directory:
             (Path(directory) / "b.toml").write_text(BOOK)
             out = io.StringIO()
-            with contextlib.redirect_stdout(out), contextlib.redirect_stderr(out):
-                code = curriculum.main([*args, directory, "/tmp"])
-            return code, out.getvalue()
+            with unittest.mock.patch.object(curriculum, "cut", fake_cut), \
+                    contextlib.redirect_stdout(out), \
+                    contextlib.redirect_stderr(out):
+                code = curriculum.main([*args, directory, "/vlt"])
+            return code, out.getvalue(), calls
 
     def test_without_a_box_it_renders_a_preview_to_look_at(self) -> None:
-        code, out = self.run_cli("snip", "SPLIT/2.1", "33")
+        code, out, calls = self.run_cli("snip", "SPLIT/2.1", "33")
         self.assertEqual(code, 0)
-        self.assertIn(f"-r {curriculum.PREVIEW_DPI}", out)
-        self.assertIn("-f 19 -l 19", out)
-        self.assertIn("LOOK at it", out)
+        self.assertEqual(calls[0]["dpi"], curriculum.PREVIEW_DPI)
+        self.assertEqual(calls[0]["page"], 19)
+        self.assertIn("READ", out)
 
     def test_the_preview_does_not_land_in_the_vault(self) -> None:
         """Scaffolding for choosing coordinates. The notes graph is for notes,
         and a directory of half-chosen page renders is not one."""
-        _, out = self.run_cli("snip", "SPLIT/2.1", "33")
-        self.assertIn("/tmp/preview-p33", out)
-        self.assertNotIn("/vault/attachments/split-book-p33", out)
+        _, _, calls = self.run_cli("snip", "SPLIT/2.1", "33")
+        self.assertEqual(calls[0]["destination"], "/tmp/preview-p33")
 
     def test_the_box_is_scaled_from_preview_dpi_to_snip_dpi(self) -> None:
-        """The reason this is a command rather than a line in a skill.
-        pdftoppm's -x/-y/-W/-H are pixels AT THE CHOSEN -r, so a box measured
-        on the preview names different pixels on the sharper render. Handing
-        it over unscaled crops the wrong part of the page, confidently."""
-        code, out = self.run_cli("snip", "SPLIT/2.1", "33", "90,405,495,165")
+        """pdftoppm's -x/-y/-W/-H are pixels AT THE CHOSEN -r, so a box
+        measured on the preview names different pixels on the sharper render.
+        Handing it over unscaled crops the wrong part of the page."""
+        code, _, calls = self.run_cli("snip", "SPLIT/2.1", "33",
+                                      "90,405,495,165")
         self.assertEqual(code, 0)
         factor = curriculum.SNIP_DPI // curriculum.PREVIEW_DPI
-        self.assertIn(f"-x {90 * factor} -y {405 * factor} "
-                      f"-W {495 * factor} -H {165 * factor}", out)
-        self.assertIn(f"-r {curriculum.SNIP_DPI}", out)
+        self.assertEqual(calls[0]["box"],
+                         (90 * factor, 405 * factor,
+                          495 * factor, 165 * factor))
+        self.assertEqual(calls[0]["dpi"], curriculum.SNIP_DPI)
 
     def test_the_cut_lands_in_the_vault_with_a_knowable_name(self) -> None:
-        code, out = self.run_cli("snip", "SPLIT/2.1", "33", "10,10,50,50")
+        code, out, calls = self.run_cli("snip", "SPLIT/2.1", "33",
+                                        "10,10,50,50")
         self.assertEqual(code, 0)
-        self.assertIn("-singlefile", out)
-        self.assertIn("/vault/attachments/split-book-p33", out)
+        self.assertEqual(calls[0]["destination"], "/vlt/attachments/split-book-p33")
         self.assertIn("![[split-book-p33.png]]", out)
 
     def test_it_says_how_to_cite_what_it_cut(self) -> None:
         """The other half of the complaint that prompted this: material the
         learner could not locate in their own copy. A snip without a printed
         page number is still unfindable."""
-        _, out = self.run_cli("snip", "SPLIT/2.1", "33", "10,10,50,50")
+        _, out, _ = self.run_cli("snip", "SPLIT/2.1", "33", "10,10,50,50")
         self.assertIn("cite it: SPLIT p. 33", out)
+
+    def test_it_says_to_look_rather_than_to_measure(self) -> None:
+        """Measured 2026-09-15: told to check its crop, a model read the PNG's
+        header bytes with struct to get its dimensions -- of the PREVIOUS
+        crop, since it had never run the one it was handed. Size was never the
+        question; whether the table is whole is."""
+        _, out, _ = self.run_cli("snip", "SPLIT/2.1", "33", "10,10,50,50")
+        self.assertIn("do not measure it", out)
 
     def test_a_malformed_box_is_not_read_as_a_directory(self) -> None:
         """It sits in the same argument slot as the canon directory, so left
@@ -852,9 +872,84 @@ class TestSnip(unittest.TestCase):
         self.assertIn("not a crop box", out.getvalue())
 
     def test_a_page_outside_the_topic_warns_but_still_works(self) -> None:
-        code, out = self.run_cli("snip", "SPLIT/2.1", "50", "10,10,50,50")
+        code, out, _ = self.run_cli("snip", "SPLIT/2.1", "50", "10,10,50,50")
         self.assertEqual(code, 0)
         self.assertIn("outside", out)
+
+    def test_a_failed_render_is_reported_not_swallowed(self) -> None:
+        import contextlib
+        import io
+
+        def angry(*_args, **_kwargs):
+            raise curriculum._Unresolved("pdftoppm failed: no such file")
+
+        with tempfile.TemporaryDirectory() as directory:
+            (Path(directory) / "b.toml").write_text(BOOK)
+            out = io.StringIO()
+            with unittest.mock.patch.object(curriculum, "cut", angry), \
+                    contextlib.redirect_stdout(out), \
+                    contextlib.redirect_stderr(out):
+                code = curriculum.main(["snip", "SPLIT/2.1", "33",
+                                        "10,10,50,50", directory, "/vlt"])
+        self.assertEqual(code, 1)
+        self.assertIn("pdftoppm failed", out.getvalue())
+
+
+class TestSnipActuallyCuts(unittest.TestCase):
+    """It runs pdftoppm rather than printing it, and that is the point.
+
+    Measured 2026-09-15: handed a crop command to run, a model called `snip`
+    three times with different anchors, ran none of them, and spent the rest
+    of the turn reading header bytes off the PREVIOUS crop trying to work out
+    why nothing had changed. An instruction to run a command is a step that
+    can be skipped silently. A file on disk cannot be."""
+
+    def test_cut_invokes_pdftoppm_with_the_box(self) -> None:
+        import subprocess
+
+        seen = {}
+
+        def fake_run(cmd, **kwargs):
+            seen["cmd"] = cmd
+            Path(cmd[-1] + ".png").write_bytes(b"\x89PNG\r\n\x1a\n")
+            return subprocess.CompletedProcess(cmd, 0, "", "")
+
+        with tempfile.TemporaryDirectory() as directory:
+            target = f"{directory}/out"
+            with unittest.mock.patch("subprocess.run", fake_run):
+                written = curriculum.cut("/subject/b.pdf", 22,
+                                         (10, 20, 30, 40), target)
+            self.assertTrue(Path(written).exists())
+        self.assertEqual(seen["cmd"][0], "pdftoppm")
+        for flag, value in (("-x", "10"), ("-y", "20"),
+                            ("-W", "30"), ("-H", "40")):
+            self.assertEqual(seen["cmd"][seen["cmd"].index(flag) + 1], value)
+        self.assertIn("-singlefile", seen["cmd"])
+
+    def test_a_nonzero_exit_raises_rather_than_reporting_success(self) -> None:
+        import subprocess
+
+        def fake_run(cmd, **kwargs):
+            return subprocess.CompletedProcess(cmd, 1, "", "I/O error")
+
+        with unittest.mock.patch("subprocess.run", fake_run):
+            with self.assertRaises(curriculum._Unresolved) as caught:
+                curriculum.cut("/subject/b.pdf", 1, (0, 0, 1, 1), "/tmp/x")
+        self.assertIn("I/O error", str(caught.exception))
+
+    def test_a_silent_failure_to_write_is_caught(self) -> None:
+        """pdftoppm can exit 0 and produce nothing."""
+        import subprocess
+
+        def fake_run(cmd, **kwargs):
+            return subprocess.CompletedProcess(cmd, 0, "", "")
+
+        with tempfile.TemporaryDirectory() as directory:
+            with unittest.mock.patch("subprocess.run", fake_run):
+                with self.assertRaises(curriculum._Unresolved) as caught:
+                    curriculum.cut("/subject/b.pdf", 1, (0, 0, 1, 1),
+                                   f"{directory}/nothing")
+        self.assertIn("wrote nothing", str(caught.exception))
 
 
 class TestAnchoredCrops(unittest.TestCase):
