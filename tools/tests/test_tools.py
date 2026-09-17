@@ -769,3 +769,18 @@ class TestOptionsAreNamedNotLettered(unittest.TestCase):
             "On row 5: reg2=1, hab2=1, hab3=0, so reg2:hab2=1. The claim that "
             "both are identically zero is wrong, since reg2:hab2 is 1 there.")
         self.assertTrue(posed.question_id)
+
+    def test_a_lettered_hint_is_refused_too(self) -> None:
+        """The hint is committed at posing time as well, so it carries the
+        same defect: its letters are the author's order, not the reader's."""
+        with self.assertRaises(ToolError):
+            server.quiz(prompt="Why NA?", options=self.options(),
+                        correct_option_id="opt1",
+                        explanation="The 'identically zero' option is right.",
+                        hint="Think about why C cannot be the answer.")
+
+    def test_no_hint_at_all_is_fine(self) -> None:
+        posed = server.quiz(prompt="Why NA?", options=self.options(),
+                            correct_option_id="opt1",
+                            explanation="The 'identically zero' option is right.")
+        self.assertTrue(posed.question_id)

@@ -219,8 +219,15 @@ class QuizResult:
       unknown / incoherent  -> the floor for this strand. stop probing down.
 
     `pick_correct` stays a boolean and is False for "I don't know", because
-    the pick was not correct. The diagnosis is where the three states are
-    distinguished; do not read `pick_correct` as "wrong".
+    the pick was not correct. **`pick_state` is the field that distinguishes
+    the three**; do not read `pick_correct` as "wrong".
+
+    That warning was here from the start and was not enough. `pick_state` was
+    added on 2026-09-17 because the markdown mirror read exactly the boolean
+    it says not to, and rendered an honest "I don't know" as "pick wrong" --
+    in front of a learner who had just declined to guess, which is the
+    behaviour the option exists to encourage. A comment telling a reader not
+    to misuse a field does not stop them; publishing the right field does.
 
     The three `unknown` rows were added on 2026-09-13 after a probe session in
     which five of ten questions were answered "I don't remember" — and none of
@@ -243,6 +250,7 @@ class QuizResult:
     """
 
     pick_correct: bool
+    pick_state: PickState
     reason_verdict: ReasonVerdict
     diagnosis: str
     next_step: str
@@ -361,12 +369,19 @@ _APPOSITIVE_WORDS = 6
 # linear combination. The explanation then read "C is wrong: there is no
 # alphabetical-drop rule" -- about the option the learner had just correctly
 # chosen. Every letter in it was wrong for its reader.
-_OPTION_LETTER = re.compile(r"""(?xi)
-      \boption \s* \(? [a-e] \)? (?![a-z])
-    | \( \s* [a-e] \s* \) \s+ (?=\w)
-    | \b [a-e] \s+ (?: is | are | was | were ) \s+
-        (?: wrong | right | correct | incorrect | true | false
-          | the \b | a \b | an \b | not \b )
+_OPTION_LETTER = re.compile(r"""(?x)
+    # "option c", "Option (A)" -- explicit, in either case.
+      \b [Oo]ption \s* \(? [A-Ea-e] \)? (?![A-Za-z])
+    # "(c) is wrong", "(a) swaps ..."
+    | \( \s* [A-Ea-e] \s* \) \s+ (?=\w)
+    # A bare letter doing the work of a noun: "B is wrong", "why C cannot be".
+    # UPPERCASE only, which is what makes this safe -- the lowercase article
+    # "a" is the trap any bare-letter rule walks into, and a capital A is
+    # only ever followed by one of these verbs when it names an option.
+    | \b [A-E] \s+ (?: is | are | was | were | cannot | can | could | would
+                     | should | does | do | fails | holds | describes
+                     | confuses | swaps | applies | treats | assumes
+                     | ignores | would ) \b
 """)
 
 
@@ -559,7 +574,11 @@ def quiz(
             "the others were written to match it."
         )
 
-    lettered = _by_letter(explanation, options)
+    # The hint is committed here too, before the shuffle, so it carries the
+    # same defect as the explanation: a letter in it names the authoring
+    # order. Checked together so the refusal reports both at once rather than
+    # sending the agent round twice.
+    lettered = _by_letter(explanation, options) + _by_letter(hint or "", options)
     if lettered:
         raise ToolError(
             "the explanation refers to options by letter (" +
@@ -672,6 +691,7 @@ def answer_quiz(
     diagnosis, next_step = _OUTCOMES[(state, reason_verdict)]
     return QuizResult(
         pick_correct=pick_correct,
+        pick_state=state,
         reason_verdict=reason_verdict,
         diagnosis=diagnosis,
         next_step=next_step,

@@ -41,6 +41,9 @@ not listed as verified should be assumed untested.
 | Seeding | 100 notes into a vault through the real `smrt` path; re-seed is a no-op and cannot touch a judgment |
 | **A real teaching exchange** | 2026-09-11: a model posed a quiz and an explain question through Toad, graded both, and refused to soften a rubric |
 | Tool namespacing | reaches the model as `mcp__vault-tools__quiz`; the hyphen survives |
+| A hand-written page, read and checked | 2026-09-17: a phone photo of a worked derivation transcribed on request, **mis-transcribed** (bracket associations attached to the wrong term), corrected by the learner, then graded. The transcribe-first protocol caught it, which is the whole reason for the protocol |
+| The clean log | same session: 0 duplicate quiz blocks, 5 folded grades, question posed once. First run with the proxy actually mounted |
+| Probing found the floor in five questions | partial, partial, solid, solid, floor — two jumps taken on sound reasoning. `partial` and `floor` had never fired live before |
 | Lettered explanations refused | the shuffle relabels options after the explanation is committed, so a letter in it names the author's order. Caught live: "C is wrong" about the option the learner had just correctly picked |
 | `snip` does the cut | it runs `pdftoppm` rather than printing it. Measured: handed commands to run, a model called `snip` three times, ran none of them, and read header bytes off the previous crop wondering why nothing changed |
 | Text-anchored crops | 2026-09-15: `snip ASM/3.4 99 --from … --to …` produced a crop carrying all six design-matrix rows, the coefficient block and the matrix notation, with clean edges — the same page an eyeballed box had cut in half twice |
@@ -51,8 +54,8 @@ not listed as verified should be assumed untested.
 | Rendering, in Obsidian | 2026-09-13: inline SVG, an embedded `![[fig.svg]]`, and mermaid all render in Reading view. Only the **inline** one follows the theme — the identical file, embedded, stayed black in dark mode, because an embed is a separate document and `currentColor` cannot reach it |
 | The answer key | streams to the client in `rawInput` but Toad does not render it — the pre-commitment holds at the display layer |
 | `vault-tools` | serves MCP through the wrapper on `PATH`, spawned as a client spawns it |
-| Proxy tests | 80/80, in the image (Python 3.14) and on the host (3.10) |
-| Tool tests | 185/185, in the image (the MCP SDK is not a host dependency) |
+| Proxy tests | 84/84, in the image (Python 3.14) and on the host (3.10) |
+| Tool tests | 187/187, in the image (the MCP SDK is not a host dependency) |
 | shellcheck | zero errors across `bin/smrt`, `scripts/`, `docker/` |
 
 The read-only enforcement is the claim the project rests on, and it survived

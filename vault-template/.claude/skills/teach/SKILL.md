@@ -104,7 +104,18 @@ measures nothing. Ask instead for what a pick alone cannot show:
 
 - *"In one line: what makes the nearest wrong option wrong?"*
 - *"One line: what rule are you applying?"*
-- *"One line: what would have to be true for B to be right instead?"*
+- *"One line: what would have to be true for the 'no intercept' option to be
+  right instead?"*
+
+Name the option by its claim, never by its letter — see below. That applies to
+the `hint` as much as to the explanation, and the tool refuses both.
+
+**Write the maths as LaTeX.** The learner reads this in Obsidian, which renders
+it. `$\partial/\partial\theta \log L(\theta; X)$` is legible; the same
+thing typed in loose unicode is not, and a question nobody can read measures
+nothing. Inline in `$…$`, display in `$$…$$`. Measured 2026-09-17: a score
+function posed as plain text had to be asked for again in LaTeX before it could
+be answered — a whole turn lost to formatting.
 
 See `docs/teaching-loop.md` for distractor construction and the eight-outcome
 diagnosis table.

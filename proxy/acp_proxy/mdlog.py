@@ -358,7 +358,16 @@ class MdLog:
         than dropped. The diagnosis stays in the summary line, visible while
         folded, because that is the one word worth skimming for.
         """
-        mark = "correct" if out.get("pick_correct") else "wrong"
+        # `pick_state`, not `pick_correct`. The boolean is False for "I don't
+        # know" as well as for a wrong answer, and rendering that as "pick
+        # wrong" told a learner who had honestly declined to guess that they
+        # had got it wrong -- in the log, under the grade. Declining is the
+        # behaviour the "I don't know" option exists to encourage; scoring it
+        # as an error is the one reading guaranteed to stop it.
+        mark = {"right": "correct", "wrong": "wrong",
+                "unknown": "declined"}.get(str(out.get("pick_state") or ""))
+        if mark is None:      # older payloads carry only the boolean
+            mark = "correct" if out.get("pick_correct") else "wrong"
         head = f"{out.get('diagnosis')} — pick {mark}"
         if verdict := out.get("reason_verdict"):
             head += f", reasoning {verdict}"

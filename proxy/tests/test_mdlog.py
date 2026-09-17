@@ -408,3 +408,41 @@ class TestTheGradeIsFoldedShut(Base):
         written = self.read()
         self.assertIn("observed Fisher information", written)
         self.assertIn("</details>", written)
+
+
+class TestDecliningIsNotWrong(Base):
+    """Measured 2026-09-17: a learner answered "Don't know this one", the tool
+    graded it `floor` (an unknown-state outcome), and the log rendered it as
+    "pick wrong" — because `pick_correct` is False for a decline as well as
+    for an error. Declining is the behaviour the option exists to encourage."""
+
+    def graded(self, **over):
+        body = dict(QUIZ_RESULT)
+        body.update(over)
+        return body
+
+    def test_an_unknown_pick_reads_as_declined(self) -> None:
+        self.feed(completed("t2", self.graded(pick_state="unknown",
+                                              pick_correct=False,
+                                              diagnosis="floor")))
+        written = self.read()
+        self.assertIn("declined", written)
+        self.assertNotIn("pick wrong", written)
+
+    def test_a_wrong_pick_still_reads_as_wrong(self) -> None:
+        self.feed(completed("t2", self.graded(pick_state="wrong",
+                                              pick_correct=False,
+                                              diagnosis="misconception")))
+        self.assertIn("pick wrong", self.read())
+
+    def test_a_right_pick_still_reads_as_correct(self) -> None:
+        self.feed(completed("t2", self.graded(pick_state="right",
+                                              pick_correct=True)))
+        self.assertIn("pick correct", self.read())
+
+    def test_a_payload_without_pick_state_falls_back(self) -> None:
+        """The field is new; a mirror must not break on an older payload."""
+        body = self.graded()
+        body.pop("pick_state", None)
+        self.feed(completed("t2", body))
+        self.assertIn("pick", self.read())
