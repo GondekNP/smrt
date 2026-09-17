@@ -41,7 +41,8 @@ not listed as verified should be assumed untested.
 | Seeding | 100 notes into a vault through the real `smrt` path; re-seed is a no-op and cannot touch a judgment |
 | **A real teaching exchange** | 2026-09-11: a model posed a quiz and an explain question through Toad, graded both, and refused to soften a rubric |
 | Tool namespacing | reaches the model as `mcp__vault-tools__quiz`; the hyphen survives |
-| A hand-written page, read and checked | 2026-09-17: a phone photo of a worked derivation transcribed on request, **mis-transcribed** (bracket associations attached to the wrong term), corrected by the learner, then graded. The transcribe-first protocol caught it, which is the whole reason for the protocol |
+| A hand-written page, read and checked | 2026-09-17: a phone photo of a worked derivation was read, graded, and the reading was wrong first time — an underbrace attached to `2p(x)` instead of the `x p(x)` it spans |
+| Transcribe-first was the wrong protocol | same photo, same question, asked directly from the image with no transcription step: correct 3/3. An underbrace over a sub-expression has no faithful ASCII form, so transcription *introduced* the error rather than revealing it. Replaced by citation — point at the line, quote the fragment |
 | The clean log | same session: 0 duplicate quiz blocks, 5 folded grades, question posed once. First run with the proxy actually mounted |
 | Probing found the floor in five questions | partial, partial, solid, solid, floor — two jumps taken on sound reasoning. `partial` and `floor` had never fired live before |
 | Lettered explanations refused | the shuffle relabels options after the explanation is committed, so a letter in it names the author's order. Caught live: "C is wrong" about the option the learner had just correctly picked |

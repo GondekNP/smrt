@@ -348,6 +348,15 @@ The manual `x,y,w,h` form survives for pages with no text layer, and the
 preview for it goes to `/tmp` rather than the vault — scaffolding, not notes.
 Only the cut lands in `attachments/`.
 
+The same rule runs the other way, for work the learner submits: **cite it, do
+not transcribe it.** Measured 2026-09-17 — transcribing a hand-worked
+derivation moved an underbrace onto the wrong term, while reading the image
+directly answered the same question correctly three times out of three. A brace
+spanning a sub-expression has no faithful ASCII form, so serialising it
+approximates, and everything downstream is then judging the approximation.
+Point at the line and quote the fragment instead; specificity is what makes a
+reading checkable, not serialisation.
+
 **And every claim about the text carries its printed page.** "As Kéry notes" is
 unfindable; "Kéry p. 98" can be turned to. A learner with the book open who
 cannot locate a claim either takes it on faith — the opposite of the point — or

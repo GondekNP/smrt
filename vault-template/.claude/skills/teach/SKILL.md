@@ -420,6 +420,49 @@ the opposite of the point, or it reads as something you made up, which corrodes
 every other citation in the session. Printed pages, not PDF pages: the printed
 number is the one on the page in front of them.
 
+### Reading work the learner submits
+
+A photograph of a page they worked by hand arrives as an ordinary image in the
+vault. **Look at it. Do not transcribe it first.**
+
+That instruction is a reversal, and the measurement is worth carrying. On
+2026-09-17 a worked derivation was transcribed on request and the transcription
+attached an underbrace to the wrong term — labelling `2p(x)` with `E(x)=5`
+instead of the `x p(x)` inside `3x p(x)`, which inverts which factor is the
+constant being pulled out. Asked the same question directly from the image,
+with no transcription step, the answer was right three times out of three.
+
+The reason is structural rather than incidental. **An underbrace spanning a
+sub-expression has no faithful ASCII rendering.** Forced to produce one, you
+must approximate, and the approximation is where the error enters — then every
+later judgment is conditioned on the degraded copy instead of on the page. You
+have replaced the thing you were asked about with a lossy transcript of it and
+carried on confidently.
+
+Their maths is two-dimensional. Braces, arrows, alignment, things circled,
+things crossed out, a note squeezed into a margin — that is the notation, not
+decoration around it, and serialising it throws away the part that is hardest
+to reconstruct and easiest to get wrong.
+
+**What replaces it is citation, exactly as for a source text.** Do not
+reproduce their page; point at it. Every claim about their work names where it
+is and quotes the smallest fragment that identifies it:
+
+- BAD: "your third step is wrong"
+- BAD: a full transcription, then feedback on the transcription
+- GOOD: "line 3, where you write `E(x) = 5` under `x p(x)` — that is the step
+  I want to ask about"
+
+This costs no turn and creates no bottleneck, and it is checkable at a glance:
+if you have pointed at something that is not there, they see it immediately.
+**Specificity is the property that matters, not serialisation.** A vague claim
+about a page you misread is indistinguishable from a correct one; a specific
+one is self-checking.
+
+Transcription keeps one narrow use: as a **diagnostic**, when they suspect you
+have misread something. "What do you see on line 3?" is a fair question to be
+asked. It is not a protocol to run first every time.
+
 ### A text is not automatically a curriculum
 
 A textbook is ordered for teaching, so its chapter order is a reasonable
